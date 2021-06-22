@@ -6,7 +6,7 @@ public class CameraControl : MonoBehaviour
 {
     private float rotX;
     public float sensitivity = 5f;
-    public float movementSpeed = 5f;
+    public float movementSpeed = 50f;
     // Start is called before the first frame update
     void Start()
     {
