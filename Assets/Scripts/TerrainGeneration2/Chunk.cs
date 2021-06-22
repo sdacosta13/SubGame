@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class Chunk
 {
-    public List<Vector3> vertices;
-    public List<int> triangles;
+    public List<Vector3> vertices = null;
+    public List<int> triangles = null;
     public Vector3 pos;
     public Chunk(Vector3 _pos)
     {
@@ -17,5 +17,6 @@ public class Chunk
         m.CreateMeshData();
         vertices = m.vertices;
         triangles = m.triangles;
+        //Debug.Log("Chunk " + pos.ToString() + " Complete");
     }
 }
