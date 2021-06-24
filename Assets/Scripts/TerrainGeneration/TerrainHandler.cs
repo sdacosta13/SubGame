@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 public class TerrainHandler : MonoBehaviour
@@ -56,10 +57,14 @@ public class TerrainHandler : MonoBehaviour
         go.AddComponent<MeshRenderer>();
         go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
         Mesh m = new Mesh();
-        m.vertices = c.vertices.ToArray();
-        m.triangles = c.triangles.ToArray();
+        m.vertices = c.meshData.vertices.ToArray();
+        m.triangles = c.meshData.triangles.ToArray();
         m.RecalculateNormals();
         go.GetComponent<MeshFilter>().mesh = m;
         gameObjects[position] = go;
+    }
+    void OnDestroy()
+    {
+        cm.Destroy();
     }
 }

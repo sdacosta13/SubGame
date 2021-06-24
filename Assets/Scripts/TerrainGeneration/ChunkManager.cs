@@ -6,7 +6,7 @@ using UnityEngine;
 public class ChunkManager
 {
     private Dictionary<Vector3, Chunk> chunks;
-    private Dictionary<Vector3, Thread> threads;
+    public Dictionary<Vector3, Thread> threads;
     public ChunkManager()
     {
         chunks = new Dictionary<Vector3, Chunk>();
@@ -18,7 +18,7 @@ public class ChunkManager
     }
     public bool chunkComplete(Vector3 pos)
     {
-        if(chunks[pos].triangles != null && chunks[pos].vertices != null)
+        if(chunks[pos].meshData.triangles != null && chunks[pos].meshData.vertices != null)
         {
             return true;
         }
@@ -33,14 +33,31 @@ public class ChunkManager
     }
     public void CreateChunk(Vector3 pos)
     {
-        if (!threads.ContainsKey(pos))
+        if (Constants.generateViaShaderCompute)
         {
             Chunk c = new Chunk(pos);
             chunks[pos] = c;
-            Thread th = new Thread(c.Generate);
-            th.Start();
-            threads[pos] = th;
+            c.Generate();
         }
+        else
+        {
+            if (!threads.ContainsKey(pos))
+            {
+                Chunk c = new Chunk(pos);
+                chunks[pos] = c;
+                Thread th = new Thread(c.Generate);
+                th.Start();
+                threads[pos] = th;
+            }
+        }
+        
 
+    }
+    public void Destroy()
+    {
+        foreach(Chunk c in chunks.Values)
+        {
+            c.Destroy();
+        }
     }
 }
