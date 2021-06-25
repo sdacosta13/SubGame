@@ -4,11 +4,11 @@ using UnityEngine;
 
 public class Constants
 {
-    public static readonly int chunkSize = 32;
+    public static readonly int chunkSize = 32; //updating requires ChunkGenerator.compute to have array indices updated
     public static readonly int maxChunkNum = 2;
     public static readonly int chunkloadradius = 2;
     public static readonly string levelName = "TESTLEVEL";
-
+	public static readonly float perlinThreshold = 0.2f;
 	public static readonly Vector3Int[] CornerTable = new Vector3Int[8] {
 
 		new Vector3Int(0, 0, 0),
@@ -40,7 +40,6 @@ public class Constants
 
 	};
 	public static readonly int[,] TriangleTable = new int[,] {
-
 		{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 		{0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
 		{0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
@@ -59,6 +60,7 @@ public class TerrainHandler : MonoBehaviour
         Mesh m = new Mesh();
         m.vertices = c.meshData.vertices.ToArray();
         m.triangles = c.meshData.triangles.ToArray();
+        
         m.RecalculateNormals();
         go.GetComponent<MeshFilter>().mesh = m;
         gameObjects[position] = go;

@@ -8,7 +8,7 @@ using UnityEngine;
 public class Chunk
 {
     ComputeBuffer tcTable;
-    ComputeBuffer perlinData;
+    ComputeBuffer boolData;
     ComputeBuffer triangles;
     ComputeBuffer vertices;
     ComputeShader cs;
@@ -18,6 +18,7 @@ public class Chunk
         #nullable enable
         public List<Vector3>? vertices;
         public List<int>? triangles;
+        public bool done;
         #nullable disable
     }
     public MeshData meshData = new MeshData();
@@ -26,6 +27,8 @@ public class Chunk
     public Chunk(Vector3 _pos)
     {
         pos = _pos;
+        meshData.vertices = new List<Vector3>();
+        meshData.triangles = new List<int>();
     }
     public override string ToString()
     {
@@ -43,6 +46,7 @@ public class Chunk
             m.CreateMeshData();
             this.meshData.vertices = m.vertices;
             this.meshData.triangles = m.triangles;
+            this.meshData.done = true;
             //string json = JsonUtility.ToJson(meshData);
             //Directory.CreateDirectory(path + "/" +  Constants.levelName);
             //FileOperator.Write(path + "/" + Constants.levelName+ "/" + ToString() + ".json", json);
@@ -65,39 +69,41 @@ public class Chunk
         triangles.GetData(tris);
         foreach(int tri in tris)
         {
-            if(tri > -1) {
-                meshData.triangles.Add(tri);
-            }
+            meshData.triangles.Add(tri);
         }
+        meshData.done = true;
 
     }
     public void SetupShaderCompute()
     {
         tcTable = new ComputeBuffer(Constants.TriangleTable.Length, sizeof(int));
         tcTable.SetData(Constants.TriangleTable);
-        perlinData = new ComputeBuffer((int) Mathf.Pow(Constants.chunkSize + 1, 3), sizeof(float));
-        perlinData.SetData(GetPerlinData());
+        boolData = new ComputeBuffer((int) Mathf.Pow(Constants.chunkSize + 1, 3), sizeof(float));
+        boolData.SetData(GetPerlinData());
         triangles = new ComputeBuffer(32 * 32 * 32 * 15 * 3 * 3, sizeof(int));
         vertices = new ComputeBuffer(32 * 32 * 32 * 15 * 3, sizeof(float));
-
-        cs = Resources.Load<ComputeShader>("/Resources/ComputeShaders/ChunkGenerator.compute");
-        Debug.Log(cs.ToString());
+        int kernalIndex = 0;
+        cs = Resources.Load<ComputeShader>("ChunkGenerator");
+        cs.GetKernelThreadGroupSizes(kernalIndex, out _, out _, out _);
         cs.SetInt("chunkSize", Constants.chunkSize);
         cs.SetFloats("offset", pos.x, pos.y, pos.z);
-        cs.SetBuffer(0, "TriangleConnectionTable", tcTable);
-        cs.SetBuffer(0, "perlinData", perlinData);
-        cs.Dispatch(0, 32, 32, 32);
+        cs.SetBuffer(kernalIndex, "TriangleConnectionTable", tcTable);
+        cs.SetBuffer(kernalIndex, "boolData", boolData);
+        cs.SetBuffer(kernalIndex, "triangles", triangles);
+        cs.SetBuffer(kernalIndex, "vertices", vertices);
+        cs.Dispatch(kernalIndex, 32, 1, 1);
     }
-    public float[,,] GetPerlinData()
+    public int[,,] GetPerlinData()
     {
-        float[,,] pd = new float[Constants.chunkSize + 1, Constants.chunkSize + 1, Constants.chunkSize + 1];
+        int[,,] pd = new int[Constants.chunkSize + 1, Constants.chunkSize + 1, Constants.chunkSize + 1];
         for(int x = 0; x < Constants.chunkSize + 1; x++)
         {
             for(int z = 0; z < Constants.chunkSize + 1; z++)
             {
                 for(int y = 0; y < Constants.chunkSize + 1; y++)
                 {
-                    pd[x,y,z] = Perlin3D(new Vector3(x, y, z));
+                    if (Perlin3D(new Vector3(x, y, z)) > Constants.perlinThreshold) pd[x, y, z] = 1;
+                    else pd[x, y, z] = 0;
                 }
             }
         }
@@ -127,9 +133,9 @@ public class Chunk
         {
             tcTable.Dispose();
         }
-        if(perlinData != null)
+        if(boolData != null)
         {
-            perlinData.Dispose();
+            boolData.Dispose();
         }
         if(triangles != null)
         {
@@ -138,7 +144,6 @@ public class Chunk
         if (vertices != null)
         {
             vertices.Dispose();
-        }
-        
+        }        
     }
 }

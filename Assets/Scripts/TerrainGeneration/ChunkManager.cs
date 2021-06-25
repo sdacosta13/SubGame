@@ -18,14 +18,7 @@ public class ChunkManager
     }
     public bool chunkComplete(Vector3 pos)
     {
-        if(chunks[pos].meshData.triangles != null && chunks[pos].meshData.vertices != null)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        return chunks[pos].meshData.done;
     }
     public Chunk GetChunk(Vector3 pos)
     {
