@@ -46,22 +46,22 @@ static float3 vertexOffset[8] =
 
 static float ReadFloatAs3D(RWStructuredBuffer<float> arr, int x, int y, int z, int sideLength)
 {
-    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    int index = z + (y * sideLength) + (x * sideLength * sideLength);
     return arr[index];
 }
 static int ReadBoolAs3D(RWStructuredBuffer<int> arr, int x, int y, int z, int sideLength)
 {
-    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    int index = z + (y * sideLength) + (x * sideLength * sideLength);
     return arr[index];
 }
 static void WriteFloatAs3D(RWStructuredBuffer<float> arr, int x, int y, int z, int sideLength, float data)
 {
-    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    int index = z + (y * sideLength) + (x * sideLength * sideLength);
     arr[index] = data;
 }
 static void WriteBoolAs3D(RWStructuredBuffer<bool> arr, int x, int y, int z, int sideLength, bool data)
 {
-    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    int index = z + (y * sideLength) + (x * sideLength * sideLength);
     arr[index] = data;
 }
 static int Read2dInt(RWStructuredBuffer<int> arr, int x, int y, int xSize)
