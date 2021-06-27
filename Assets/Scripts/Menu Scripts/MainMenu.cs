@@ -1,10 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
+using MLAPI;
+using MLAPI.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
-public class MainMenu : MonoBehaviour
+public class MainMenu : NetworkBehaviour
 {
     public static string netType = "host";
     public static string enteredPass = "";
@@ -17,12 +19,29 @@ public class MainMenu : MonoBehaviour
         Application.Quit();
     }
     
-    // ------------------ PLAY MENU CODE -------------------------
+    // ------------------ LOBBY MENU CODE -------------------------
+
+    public void StartLobbyAsHost()
+    {
+        netType = "host";
+    }
+    
+    public void JoinLobbyAsClient()
+    {
+        netType = "client";
+    }
+    
+    public void UpdatePassword(string text)
+    {
+        enteredPass = text;
+    }
+    
+    // ------------------ LOBBY MENU CODE -------------------------
 
     public void StartAsHost()
     {
         netType = "host";
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex+1);
+        NetworkSceneManager.SwitchScene("Game");
     }
     
     public void StartAsClient()
@@ -31,8 +50,5 @@ public class MainMenu : MonoBehaviour
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex+1);
     }
     
-    public void UpdatePass(string text)
-    {
-        enteredPass = text;
-    }
+    
 }
