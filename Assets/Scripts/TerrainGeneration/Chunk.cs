@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class Chunk
 {
@@ -39,6 +40,7 @@ public class Chunk
         if (Constants.generateViaShaderCompute)
         {
             GenerateViaShaderCompute();
+            TryToSetMesh();
         }
         else
         {
@@ -54,27 +56,37 @@ public class Chunk
         }
 
     }
-    public void GenerateViaShaderCompute()
+    public void TryToSetMesh()
     {
-        SetupShaderCompute();
-        Vector3[] vecs = new Vector3[32 * 32 * 32 * 15];
-        vertices.GetData(vecs);
-        foreach(Vector3 vec in vecs){
-            if (vec != null)
-            {
-                meshData.vertices.Add(vec);
-            }
-        }
-        int[] tris = new int[32 * 32 * 32 * 15 * 3];
-        triangles.GetData(tris);
-        foreach(int tri in tris)
+        try
         {
-            meshData.triangles.Add(tri);
+            AsyncGPUReadback.Request(vertices);
+            AsyncGPUReadback.Request(triangles);
+            Vector3[] vecs = new Vector3[32 * 32 * 32 * 15];
+            vertices.GetData(vecs);
+            foreach (Vector3 vec in vecs)
+            {
+                if (vec != null)
+                {
+                    meshData.vertices.Add(vec);
+                }
+            }
+            int[] tris = new int[32 * 32 * 32 * 15 * 3];
+            triangles.GetData(tris);
+            foreach (int tri in tris)
+            {
+                meshData.triangles.Add(tri);
+            }
+            meshData.done = true;
         }
-        meshData.done = true;
-
+        catch(Exception)
+        {
+            meshData.done = false;
+        }
+        
+        
     }
-    public void SetupShaderCompute()
+    public void GenerateViaShaderCompute()
     {
         tcTable = new ComputeBuffer(Constants.TriangleTable.Length, sizeof(int));
         tcTable.SetData(Constants.TriangleTable);
@@ -82,6 +94,7 @@ public class Chunk
         boolData.SetData(GetPerlinData());
         triangles = new ComputeBuffer(32 * 32 * 32 * 15 * 3 * 3, sizeof(int));
         vertices = new ComputeBuffer(32 * 32 * 32 * 15 * 3, sizeof(float));
+        int[] boolInt = { 0 };
         int kernalIndex = 0;
         cs = Resources.Load<ComputeShader>("ChunkGenerator");
         cs.GetKernelThreadGroupSizes(kernalIndex, out _, out _, out _);

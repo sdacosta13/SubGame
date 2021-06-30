@@ -130,11 +130,8 @@ void CreateTerrain()
                     
                 }
                 MarchCube(float3(x, y, z), cube);
-
             }
-
         }
-
     }
 };
 
@@ -144,5 +141,6 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 {
     // TODO: insert actual code here!
     CreateTerrain();
+    
 
 }

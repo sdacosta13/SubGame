@@ -33,6 +33,7 @@ public class TerrainHandler : MonoBehaviour
                     if(!(gameObjects.ContainsKey(chunkToLoadPos))){
                         if (cm.chunkExists(chunkToLoadPos))
                         {
+                            // Chunk Object exists, not done for sure
                             if (cm.chunkComplete(chunkToLoadPos))
                             {
                                 SetupGameObject(chunkToLoadPos, cm.GetChunk(chunkToLoadPos));
