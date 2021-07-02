@@ -1,0 +1,146 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+#pragma enable_d3d11_debug_symbols
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWStructuredBuffer<float> floatBuffer;
+
+
+int chunkSize;
+float threshold = 0.2;
+float3 offset;
+static int vertexCount = 0;
+RWStructuredBuffer<int> TriangleConnectionTable;
+RWStructuredBuffer<int> boolData; // size of chunkSize + 1
+RWStructuredBuffer<int> triangles;
+RWStructuredBuffer<float3> vertices;
+static float3 edgeDirection[12][2] =
+{
+    { float3(0, 0, 0), float3(1, 0, 0) },
+    { float3(1, 0, 0), float3(1, 1, 0) },
+    { float3(0, 1, 0), float3(1, 1, 0) },
+    { float3(0, 0, 0), float3(0, 1, 0) },
+    { float3(0, 0, 1), float3(1, 0, 1) },
+    { float3(1, 0, 1), float3(1, 1, 1) },
+    { float3(0, 1, 1), float3(1, 1, 1) },
+    { float3(0, 0, 1), float3(0, 1, 1) },
+    { float3(0, 0, 0), float3(0, 0, 1) },
+    { float3(1, 0, 0), float3(1, 0, 1) },
+    { float3(1, 1, 0), float3(1, 1, 1) },
+    { float3(0, 1, 0), float3(0, 1, 1) },
+    
+};
+static float3 vertexOffset[8] =
+{
+    float3(0, 0, 0),
+    float3(1, 0, 0),
+    float3(1, 1, 0),
+    float3(0, 1, 0),
+	float3(0, 0, 1),
+    float3(1, 0, 1),
+    float3(1, 1, 1),
+    float3(0, 1, 1)
+};
+
+static float ReadFloatAs3D(RWStructuredBuffer<float> arr, int x, int y, int z, int sideLength)
+{
+    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    return arr[index];
+}
+static int ReadBoolAs3D(RWStructuredBuffer<int> arr, int x, int y, int z, int sideLength)
+{
+    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    return arr[index];
+}
+static void WriteFloatAs3D(RWStructuredBuffer<float> arr, int x, int y, int z, int sideLength, float data)
+{
+    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    arr[index] = data;
+}
+static void WriteBoolAs3D(RWStructuredBuffer<bool> arr, int x, int y, int z, int sideLength, bool data)
+{
+    int index = x + (y * sideLength) + (z * sideLength * sideLength);
+    arr[index] = data;
+}
+static int Read2dInt(RWStructuredBuffer<int> arr, int x, int y, int xSize)
+{
+    int index = x + (y * xSize);
+    return arr[index];
+}
+int GetCubeConfiguration(bool cube[8])
+{
+    int adder[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+    int config = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        if (cube[i])
+        {
+            config += adder[i];
+        }
+    }
+    return config;
+}
+void MarchCube(float3 position, bool cube[8])
+{
+    int configIndex = GetCubeConfiguration(cube);
+    if (configIndex == 0 || configIndex == 255)
+    {
+        return;
+    }
+    int edge = 0;
+    for (int i = 0; i < 5; i++)
+    {
+        for (int p = 0; p < 3; p++)
+        {
+            int indice = Read2dInt(TriangleConnectionTable, edge, configIndex, 16);
+            if (indice == -1)
+                return;
+            float3 vert1 = position + edgeDirection[indice][0];
+            float3 vert2 = position + edgeDirection[indice][1];
+            float3 vert = (vert1 + vert2) / 2;
+            vertices[vertexCount] = vert + offset;
+            triangles[vertexCount] = vertexCount;
+            vertexCount++;
+            edge++;
+            
+        }
+
+    }
+
+}
+void CreateTerrain()
+{
+    for (int x = 0; x < chunkSize; x++)
+    {
+        for (int z = 0; z < chunkSize; z++)
+        {
+            for (int y = 0; y < chunkSize; y++)
+            {
+                bool cube[8];
+                for (int i = 0; i < 8; i++)
+                {
+                    float3 corner = float3(x, y, z) + vertexOffset[i];
+                    int data = ReadBoolAs3D(boolData, corner.x, corner.y, corner.z, chunkSize + 1);
+                    if (data == 1)
+                        cube[i] = true;
+                    else
+                        cube[i] = false;
+                    
+                }
+                MarchCube(float3(x, y, z), cube);
+
+            }
+
+        }
+
+    }
+};
+
+
+[numthreads(32, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    // TODO: insert actual code here!
+    CreateTerrain();
+
+}
