@@ -19,6 +19,7 @@ public class Chunk
         #nullable enable
         public List<Vector3>? vertices;
         public List<int>? triangles;
+        public Vector3[] normals;
         public bool done;
         #nullable disable
     }
@@ -48,6 +49,7 @@ public class Chunk
             m.CreateMeshData();
             this.meshData.vertices = m.vertices;
             this.meshData.triangles = m.triangles;
+            this.meshData.normals = m.normals;
             this.meshData.done = true;
             //string json = JsonUtility.ToJson(meshData);
             //Directory.CreateDirectory(path + "/" +  Constants.levelName);

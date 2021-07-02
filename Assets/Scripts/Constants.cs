@@ -9,6 +9,8 @@ public class Constants
     public static readonly int chunkloadradius = 2;
     public static readonly string levelName = "TESTLEVEL";
 	public static readonly float perlinThreshold = 0.2f;
+	public static readonly bool generateViaShaderCompute = false;
+	public static readonly bool RWlevels = false; // should remain false until I can find an alternative to binary formatter
 	public static readonly Vector3Int[] CornerTable = new Vector3Int[8] {
 
 		new Vector3Int(0, 0, 0),
@@ -298,5 +300,4 @@ public class Constants
 		{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1}
 
 	};
-	public static readonly bool generateViaShaderCompute = true;
 }

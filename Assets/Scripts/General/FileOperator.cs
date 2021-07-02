@@ -1,11 +1,18 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using System.Collections.Generic;
+
 
 public static class FileOperator
 {
+    public static void WriteMesh(Mesh m, Vector3 pos)
+    {
+    }
+    public static Mesh ReadMesh(Vector3 pos)
+    {
+        return null;
+    }
     public static void Write(string path, string data)
     {
         try

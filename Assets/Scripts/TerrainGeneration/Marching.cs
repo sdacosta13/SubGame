@@ -10,8 +10,9 @@ public class Marching
 	int chunkSize = Constants.chunkSize;
 	bool[,,] terrainMap;
 	static System.Random r = new System.Random();
-	public List<Vector3> vertices = new List<Vector3>();
-	public List<int> triangles = new List<int>();
+	public List<Vector3> vertices = new List<Vector3>(32 * 32 * 32);
+	public List<int> triangles = new List<int>(32 * 32 * 32);
+	public Vector3[] normals;
 	private Vector3 offset;
 	public Marching(Vector3 pos)
     {
@@ -107,8 +108,8 @@ public class Marching
 				}
 			}
 		}
+		CalculateNormals();
 	}
-
 	
 
 	void MarchCube(Vector3 position, bool[] cube)
@@ -151,6 +152,31 @@ public class Marching
 			}
 		}
 	}
+	void CalculateNormals()
+    {
+		normals = new Vector3[vertices.Count];
+		for(int i = 0; i < triangles.Count; i += 3)
+        {
+			int vertA = triangles[i + 0];
+			int vertB = triangles[i + 1];
+			int vertC = triangles[i + 2];
+			Vector3 surfaceNorm = SurfaceNormalFromIndices(vertA, vertB, vertC);
+			normals[vertA] += surfaceNorm;
+			normals[vertB] += surfaceNorm;
+			normals[vertC] += surfaceNorm;
+        }
+		for(int i = 0; i < normals.Length; i++)
+        {
+			normals[i].Normalize();
+        }
+    }
+	Vector3 SurfaceNormalFromIndices(int A, int B, int C)
+    {
+		Vector3 pointA = vertices[A];
+		Vector3 pointB = vertices[B];
+		Vector3 pointC = vertices[C];
+		return Vector3.Cross(pointB - pointA, pointC - pointA).normalized;
+    }
 
 	int GetCubeConfiguration(bool[] cube)
 	{

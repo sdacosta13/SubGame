@@ -39,6 +39,8 @@ public class ChunkManager
                 Chunk c = new Chunk(pos);
                 chunks[pos] = c;
                 Thread th = new Thread(c.Generate);
+                th.Priority = System.Threading.ThreadPriority.BelowNormal;
+                th.Name = pos.ToString() + " Chunk Generator";
                 th.Start();
                 threads[pos] = th;
             }

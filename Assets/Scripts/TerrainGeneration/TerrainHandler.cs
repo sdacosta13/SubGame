@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using UnityEngine;
 
@@ -31,6 +32,7 @@ public class TerrainHandler : MonoBehaviour
                 {
                     Vector3 chunkToLoadPos = new Vector3(x, y, z) * Constants.chunkSize + chunk;
                     if(!(gameObjects.ContainsKey(chunkToLoadPos))){
+
                         if (cm.chunkExists(chunkToLoadPos))
                         {
                             // Chunk Object exists, not done for sure
@@ -52,6 +54,24 @@ public class TerrainHandler : MonoBehaviour
             }
         }
     }
+    void AttemptLevelLoad(Vector3 chunkPos)
+    {
+        if (Constants.RWlevels)
+        {
+            Mesh m = FileOperator.ReadMesh(chunkPos);
+            SetupLoadedGameObject(chunkPos, m);
+
+        }
+    }
+    static void SetupLoadedGameObject(Vector3 position, Mesh m)
+    {
+        GameObject go = new GameObject();
+        go.AddComponent<MeshFilter>();
+        go.AddComponent<MeshRenderer>();
+        go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
+        go.GetComponent<MeshFilter>().mesh = m;
+        gameObjects[position] = go;
+    }
     static void SetupGameObject(Vector3 position, Chunk c)
     {
         GameObject go = new GameObject();
@@ -61,9 +81,19 @@ public class TerrainHandler : MonoBehaviour
         Mesh m = new Mesh();
         m.vertices = c.meshData.vertices.ToArray();
         m.triangles = c.meshData.triangles.ToArray();
-        
-        m.RecalculateNormals();
+        if (!Constants.generateViaShaderCompute)
+        {
+            m.normals = c.meshData.normals;
+        }
+        else
+        {
+            m.RecalculateNormals();
+        }
         go.GetComponent<MeshFilter>().mesh = m;
+        if (Constants.RWlevels)
+        {
+            FileOperator.WriteMesh(m, c.pos);
+        }
         gameObjects[position] = go;
     }
     void OnDestroy()
