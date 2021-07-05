@@ -22,11 +22,11 @@ public class CameraControl : MonoBehaviour
             rotX += Input.GetAxis("Mouse Y") * sensitivity;
             rotX = Mathf.Clamp(rotX, -90.0f, 90.0f);
             transform.eulerAngles = new Vector3(-rotX, transform.eulerAngles.y + y, 0);
-
+            /*
             Vector3 dir = new Vector3(0, 0, 0);
             dir.x = Input.GetAxis("Horizontal");
             dir.z = Input.GetAxis("Vertical");
             transform.Translate(dir * movementSpeed * Time.deltaTime);
-        
+            */
     }
 }
