@@ -13,7 +13,9 @@ namespace MenuScripts
         public GameObject ConListPrefab;
         public GameObject ConList;
 
-        private Dictionary<ulong, GameObject> conListItems = new Dictionary<ulong, GameObject>();
+        // server/host maintains a dictionary of clientIds against a string of data to send to all clients every frame
+        // string contains username: , ping: , etc.
+        private Dictionary<ulong, ConData> _conListItems = new Dictionary<ulong, ConData>();
 
         private void Start()
         {
@@ -33,6 +35,7 @@ namespace MenuScripts
                     break;
                 case "host":
                     NetworkManager.Singleton.StartHost();
+                    // set up ConData for host client - steamId etc
                     break;
                 case "client":
                     // to set up connection (is local machine by default)
@@ -75,7 +78,7 @@ namespace MenuScripts
             Debug.Log("hash = " + prefabHash);
 
             //If approve is true, the connection gets added. If it's false. The client gets disconnected
-            callback(false, prefabHash, approve, new Vector3(0, 0, 0), Quaternion.identity);
+            callback(false, prefabHash, approve, Vector3.zero, Quaternion.identity);
         }
 
         public void Disconnect()
@@ -97,10 +100,32 @@ namespace MenuScripts
             UnityEngine.SceneManagement.SceneManager.LoadScene("Menu");
         }
 
-        [ClientRpc]
-        void SetNetObjectParentClientRpc(ulong netObjId)
+        [ServerRpc]
+        private void SendClientDataServerRpc(ulong clientId, string clientData)
         {
-            
+            var cData = new ConData(clientData);
+            _conListItems[clientId] = cData;
+            UpdateClientListClientRpc(GetAllConDataAsString());
+        }
+
+        [ClientRpc]
+        private void UpdateClientListClientRpc(string allClientData)
+        {
+            // remake content
+
+            // remove all content first
+            for (var i = ConList.transform.childCount - 1; i >= 0; i--)
+            {
+                Destroy(transform.GetChild(i).gameObject);
+            }
+
+            // then re-add
+            foreach (var clientData in allClientData.Split(new[] {Environment.NewLine},
+                StringSplitOptions.RemoveEmptyEntries))
+            {
+                var temp = new ConData(clientData);
+                var go = Instantiate(ConListPrefab, ConList.transform);
+            }
         }
 
         private void OnClientConnect(ulong id)
@@ -108,16 +133,14 @@ namespace MenuScripts
             if (NetworkManager.Singleton.IsClient)
             {
                 Debug.Log("IsClient");
+                // maybe collect clientData at approval check then use here, tbd when steam integration
+                SendClientDataServerRpc(id, "steam_id:1234;display_name:hello4321;");
             }
 
             if (NetworkManager.Singleton.IsHost)
                 Debug.Log("IsHost");
             if (NetworkManager.Singleton.IsServer)
             {
-                var go = Instantiate(ConListPrefab, ConList.transform);
-                go.GetComponent<NetworkObject>().SpawnWithOwnership(id);
-                var netId = go.GetComponent<NetworkObject>().NetworkObjectId;
-                // now RPC the clients to change the parent transform
                 Debug.Log("IsServer");
             }
         }
@@ -126,11 +149,64 @@ namespace MenuScripts
         {
             if (NetworkManager.Singleton.IsServer)
             {
-                conListItems[id].GetComponent<NetworkObject>().Despawn(true);
-                conListItems.Remove(id);
+                _conListItems.Remove(id);
+                UpdateClientListClientRpc(GetAllConDataAsString());
             }
             else if (NetworkManager.Singleton.IsClient)
                 UnityEngine.SceneManagement.SceneManager.LoadScene("Menu");
+        }
+
+        // only ever call this on server
+        private string GetAllConDataAsString()
+        {
+            return _conListItems.Aggregate("",
+                (current, conData) => current + (conData.Key.ToString() + Environment.NewLine));
+        }
+    }
+
+    public struct ConData
+    {
+        public int Ping { get; set; }
+        public string SteamId { get; }
+        public string DisplayName { get; set; }
+
+        public ConData(string data) : this(data.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries))
+        {
+        }
+
+        public ConData(IEnumerable<string> data)
+        {
+            // defaults
+            Ping = 0;
+            SteamId = "undefined";
+            DisplayName = "default";
+            foreach (var dataLine in data)
+            {
+                var dataSplit = dataLine.Split(':');
+                switch (dataSplit[0])
+                {
+                    case "ping":
+                        Ping = int.Parse(dataSplit[1]);
+                        break;
+                    case "steam_id":
+                        SteamId = dataSplit[1];
+                        break;
+                    case "display_name":
+                        DisplayName = dataSplit[1];
+                        break;
+                    default:
+                        Debug.Log("ConData variable not implemented: " + dataSplit[0]);
+                        break;
+                }
+            }
+        }
+
+        // update method for each new member var
+        public override string ToString()
+        {
+            return "steam_id:" + SteamId + ";"
+                   + "display_name:" + DisplayName + ";"
+                   + "ping:" + Ping + ";";
         }
     }
 }
