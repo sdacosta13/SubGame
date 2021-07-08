@@ -1,12 +1,7 @@
-using System.Collections.Generic;
 using MLAPI;
-using MLAPI.SceneManagement;
-using UnityEditor.Rendering;
 using UnityEngine;
-using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 
-namespace MenuScripts
+namespace Menu
 {
     public class MainMenu : NetworkBehaviour
     {

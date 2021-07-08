@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using MLAPI;
 using UnityEngine;
 
-namespace GameScripts
+namespace Game
 {
     public class NetworkCommandLine : MonoBehaviour
     {

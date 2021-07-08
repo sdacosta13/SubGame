@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GameScripts
+namespace Game
 {
     public class PlayerMovement : MonoBehaviour
     {

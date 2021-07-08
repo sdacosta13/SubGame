@@ -6,7 +6,7 @@ using MLAPI.Messaging;
 using MLAPI.Spawning;
 using UnityEngine;
 
-namespace MenuScripts
+namespace Menu
 {
     public class ConnectionScript : NetworkBehaviour
     {

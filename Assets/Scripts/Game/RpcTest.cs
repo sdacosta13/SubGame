@@ -1,7 +1,7 @@
 using MLAPI;
 using MLAPI.Messaging;
 
-namespace GameScripts
+namespace Game
 {
     public class RpcTest : NetworkBehaviour
     {
