@@ -4,6 +4,7 @@ using System.Linq;
 using MLAPI;
 using MLAPI.Messaging;
 using MLAPI.Spawning;
+using TMPro;
 using UnityEngine;
 
 namespace Menu
@@ -20,10 +21,44 @@ namespace Menu
         private void Start()
         {
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnect;
-            //NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
+
+            // stuff to do when the server has finished starting
+            NetworkManager.Singleton.OnServerStarted += OnServerStart;
 
             //NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
             NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
+        }
+
+        private void Update()
+        {
+            // if (IsServer)
+            // {
+            //     var connectedClients = new HashSet<ulong>(NetworkManager.ConnectedClients.Keys);
+            //     if (!connectedClients.SetEquals(_conListItems.Keys))
+            //     {
+            //         Debug.Log("===========================================");
+            //         foreach (var client in connectedClients)
+            //         {
+            //             Debug.Log("Client: " + client);
+            //         }
+            //         Debug.Log("--------------------------------------------");
+            //         foreach (var client in _conListItems)
+            //         {
+            //             Debug.Log("Think Client: " + client.Key + " with " + client.Value);
+            //         }
+            //         Debug.Log("===========================================");
+            //         var diff = connectedClients.Except(_conListItems.Keys);
+            //         var removed = false;
+            //         // foreach (var conn in diff)
+            //         // {
+            //         //     removed |= _conListItems.Remove(conn);
+            //         // }
+            //         
+            //
+            //         if (removed) UpdateClientListClientRpc(GetAllConDataAsString());
+            //     }
+            // }
         }
 
         public void Connect(string netType)
@@ -58,7 +93,7 @@ namespace Menu
         {
             //parsing connectionData
             var cDataArray = System.Text.Encoding.Default.GetString(connectionData)
-                .Split(new char[] {';'}, StringSplitOptions.RemoveEmptyEntries) // splits lines
+                .Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries) // splits lines
                 .Select(a => a.Split(':')); // splits var name from var        
             var approve = true;
             foreach (var operation in cDataArray)
@@ -105,67 +140,64 @@ namespace Menu
         }
 
         [ServerRpc]
-        private void SendClientDataServerRpc(ulong clientId, string clientData)
+        private void SendClientDataServerRpc(string clientData)
         {
+            Debug.Log("Received new clients data");
             var cData = new ConData(clientData);
-            //_conListItems[clientId] = cData;
-            UpdateClientListClientRpc(GetAllConDataAsString());
+            _conListItems[cData.ClientId] = cData;
+            var allCondDataStr = GetAllConDataAsString();
+            Debug.Log("Client data after aggregate: " + allCondDataStr);
+            UpdateClientListClientRpc(allCondDataStr);
         }
 
         [ClientRpc]
         private void UpdateClientListClientRpc(string allClientData)
         {
+            // this is also received by the host client
             Debug.Log("Remaking client data list");
-            //RemakeClientList(allClientData);
-        }
-
-        private void RemakeClientList(string allClientData)
-        {
             _conListItems.Clear();
-            
+
             // remove all
-            for (var i = ConList.transform.childCount - 1; i >= 0; i--)
+            foreach (Transform child in ConList.transform)
             {
-                Destroy(transform.GetChild(i).gameObject);
+                Destroy(child.gameObject);
             }
 
             // then re-add
             foreach (var clientData in allClientData.Split(new[] {Environment.NewLine},
                 StringSplitOptions.RemoveEmptyEntries))
             {
-                Debug.Log("Attempting to create new con data");
                 var temp = new ConData(clientData);
                 _conListItems[temp.ClientId] = temp;
                 var go = Instantiate(ConListPrefab, ConList.transform);
+                foreach (Transform child in go.transform)
+                {
+                    if (child.gameObject.name == "ClientName")
+                        child.gameObject.GetComponent<TextMeshProUGUI>().text = temp.DisplayName;
+                    else if (child.gameObject.name == "ClientPing")
+                        child.gameObject.GetComponent<TextMeshProUGUI>().text = temp.Ping.ToString();
+                }
                 // set some values in list
             }
         }
-        
-        private void RemakeHostList(string allClientData)
+
+        private void OnServerStart()
         {
-            // remove all
-            for (var i = ConList.transform.childCount - 1; i >= 0; i--)
+            if (IsHost)
             {
-                Destroy(transform.GetChild(i).gameObject);
-            }
-
-            // then re-add
-            foreach (var cData in _conListItems)
-            {
-                Debug.Log("Attempting to create new con data");
-                var data = cData.Value;
-                var go = Instantiate(ConListPrefab, ConList.transform);
-                // set some values in list
+                _conListItems[NetworkManager.LocalClientId] =
+                    new ConData(NetworkManager.LocalClientId, "steam121", "ciaran");
+                UpdateClientListClientRpc(GetAllConDataAsString());
             }
         }
 
-        private void OnClientConnect(ulong id)
+    private void OnClientConnect(ulong id)
         {
             if (IsClient)
             {
-                Debug.Log("IsClient");
+                Debug.Log("IsClient connects with ID " + id);
                 // maybe collect clientData at approval check then use here, tbd when steam integration
-                //SendClientDataServerRpc(id, "steam_id:1234;display_name:hello4321;");
+                SendClientDataServerRpc("steam_id:1234;display_name:hello4321;client_id:" + id + ";");
             }
 
             if (IsHost)
@@ -176,22 +208,29 @@ namespace Menu
             }
         }
 
+        // this is called when the server is closed, on the client side,
+        // not when a client disconnects from the server for some dumb ass reason
+        // so there is no way to tell when a client disconnects?
+        // dumb as fuck, hurts my brain
+        // so instead check ConnectedClients every frame and compare to _conListItems on server
+        // nvm it works now idk why god help me
         private void OnClientDisconnect(ulong id)
         {
-            if (IsServer)
+            if (IsServer || IsHost)
             {
                 _conListItems.Remove(id);
-                //UpdateClientListClientRpc(GetAllConDataAsString());
+                Debug.Log("Client " + id + " disconnected from server");
+                UpdateClientListClientRpc(GetAllConDataAsString());
             }
             else if (IsClient)
-                UnityEngine.SceneManagement.SceneManager.LoadScene("Menu");
+                Debug.Log("Server closed?");
         }
 
         // only ever call this on server
         private string GetAllConDataAsString()
         {
             return _conListItems.Aggregate("",
-                (current, conData) => current + (conData.Key + Environment.NewLine));
+                (current, conData) => current + (conData.Value + Environment.NewLine));
         }
     }
 
@@ -201,9 +240,17 @@ namespace Menu
         public int Ping { get; set; }
         public string SteamId { get; private set; }
         public string DisplayName { get; set; }
-
+        
+        public ConData(ulong clientId, string steamId, string displayName) : this()
+        {
+            ClientId = clientId;
+            SteamId = steamId;
+            DisplayName = displayName;
+        }
+        
         public ConData(string data) : this(data.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries))
         {
+            Debug.Log(data);
         }
 
         public ConData(IEnumerable<string> data)

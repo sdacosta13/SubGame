@@ -33,7 +33,7 @@ namespace Menu
 
         public void OpenLobbyMenuAsHost()
         {
-            NetType = "server";
+            NetType = "host";
             foreach (var menu in menus)
             {
                 menu.gameObject.SetActive(false);
