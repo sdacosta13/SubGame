@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Menu
 {
-    public class MainMenu : NetworkBehaviour
+    public class MainMenu : MonoBehaviour
     {
 
         public static string NetType = "host";
@@ -33,7 +33,7 @@ namespace Menu
 
         public void OpenLobbyMenuAsHost()
         {
-            NetType = "host";
+            NetType = "server";
             foreach (var menu in menus)
             {
                 menu.gameObject.SetActive(false);

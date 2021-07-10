@@ -15,35 +15,39 @@ namespace Menu
 
         // server/host maintains a dictionary of clientIds against a string of data to send to all clients every frame
         // string contains username: , ping: , etc.
-        private Dictionary<ulong, ConData> _conListItems = new Dictionary<ulong, ConData>();
+        private readonly Dictionary<ulong, ConData> _conListItems = new Dictionary<ulong, ConData>();
 
         private void Start()
         {
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnect;
-            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
+            //NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
 
-            NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+            //NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
             NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
         }
 
-        public void Connect()
+        public void Connect(string netType)
         {
-            switch (MainMenu.NetType)
+            Debug.Log("Trying to start with " + netType);
+            switch (netType)
             {
                 case "server":
+                    Debug.Log("server");
                     NetworkManager.Singleton.StartServer();
                     break;
                 case "host":
+                    Debug.Log("host");
                     NetworkManager.Singleton.StartHost();
                     // set up ConData for host client - steamId etc
                     break;
                 case "client":
+                    Debug.Log("client");
                     // to set up connection (is local machine by default)
                     // NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = "127.0.0.1";
                     // NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = 7777;
 
-                    NetworkManager.Singleton.NetworkConfig.ConnectionData =
-                        System.Text.Encoding.Default.GetBytes("password:" + MainMenu.EnteredPass);
+                    // NetworkManager.Singleton.NetworkConfig.ConnectionData =
+                    //     System.Text.Encoding.Default.GetBytes("password:" + MainMenu.EnteredPass);
                     NetworkManager.Singleton.StartClient();
                     break;
             }
@@ -83,17 +87,17 @@ namespace Menu
 
         public void Disconnect()
         {
-            if (NetworkManager.Singleton.IsHost)
+            if (IsHost)
             {
-                NetworkManager.Singleton.StopHost();
+                NetworkManager.StopHost();
             }
-            else if (NetworkManager.Singleton.IsServer)
+            else if (IsServer)
             {
-                NetworkManager.Singleton.StopServer();
+                NetworkManager.StopServer();
             }
-            else if (NetworkManager.Singleton.IsClient)
+            else if (IsClient)
             {
-                NetworkManager.Singleton.StopClient();
+                NetworkManager.StopClient();
             }
 
 
@@ -104,16 +108,22 @@ namespace Menu
         private void SendClientDataServerRpc(ulong clientId, string clientData)
         {
             var cData = new ConData(clientData);
-            _conListItems[clientId] = cData;
+            //_conListItems[clientId] = cData;
             UpdateClientListClientRpc(GetAllConDataAsString());
         }
 
         [ClientRpc]
         private void UpdateClientListClientRpc(string allClientData)
         {
-            // remake content
+            Debug.Log("Remaking client data list");
+            //RemakeClientList(allClientData);
+        }
 
-            // remove all content first
+        private void RemakeClientList(string allClientData)
+        {
+            _conListItems.Clear();
+            
+            // remove all
             for (var i = ConList.transform.childCount - 1; i >= 0; i--)
             {
                 Destroy(transform.GetChild(i).gameObject);
@@ -123,23 +133,44 @@ namespace Menu
             foreach (var clientData in allClientData.Split(new[] {Environment.NewLine},
                 StringSplitOptions.RemoveEmptyEntries))
             {
+                Debug.Log("Attempting to create new con data");
                 var temp = new ConData(clientData);
+                _conListItems[temp.ClientId] = temp;
                 var go = Instantiate(ConListPrefab, ConList.transform);
+                // set some values in list
+            }
+        }
+        
+        private void RemakeHostList(string allClientData)
+        {
+            // remove all
+            for (var i = ConList.transform.childCount - 1; i >= 0; i--)
+            {
+                Destroy(transform.GetChild(i).gameObject);
+            }
+
+            // then re-add
+            foreach (var cData in _conListItems)
+            {
+                Debug.Log("Attempting to create new con data");
+                var data = cData.Value;
+                var go = Instantiate(ConListPrefab, ConList.transform);
+                // set some values in list
             }
         }
 
         private void OnClientConnect(ulong id)
         {
-            if (NetworkManager.Singleton.IsClient)
+            if (IsClient)
             {
                 Debug.Log("IsClient");
                 // maybe collect clientData at approval check then use here, tbd when steam integration
-                SendClientDataServerRpc(id, "steam_id:1234;display_name:hello4321;");
+                //SendClientDataServerRpc(id, "steam_id:1234;display_name:hello4321;");
             }
 
-            if (NetworkManager.Singleton.IsHost)
+            if (IsHost)
                 Debug.Log("IsHost");
-            if (NetworkManager.Singleton.IsServer)
+            if (IsServer)
             {
                 Debug.Log("IsServer");
             }
@@ -147,12 +178,12 @@ namespace Menu
 
         private void OnClientDisconnect(ulong id)
         {
-            if (NetworkManager.Singleton.IsServer)
+            if (IsServer)
             {
                 _conListItems.Remove(id);
-                UpdateClientListClientRpc(GetAllConDataAsString());
+                //UpdateClientListClientRpc(GetAllConDataAsString());
             }
-            else if (NetworkManager.Singleton.IsClient)
+            else if (IsClient)
                 UnityEngine.SceneManagement.SceneManager.LoadScene("Menu");
         }
 
@@ -160,14 +191,15 @@ namespace Menu
         private string GetAllConDataAsString()
         {
             return _conListItems.Aggregate("",
-                (current, conData) => current + (conData.Key.ToString() + Environment.NewLine));
+                (current, conData) => current + (conData.Key + Environment.NewLine));
         }
     }
 
     public struct ConData
     {
+        public ulong ClientId { get; private set; }
         public int Ping { get; set; }
-        public string SteamId { get; }
+        public string SteamId { get; private set; }
         public string DisplayName { get; set; }
 
         public ConData(string data) : this(data.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries))
@@ -177,6 +209,7 @@ namespace Menu
         public ConData(IEnumerable<string> data)
         {
             // defaults
+            ClientId = 0;
             Ping = 0;
             SteamId = "undefined";
             DisplayName = "default";
@@ -185,6 +218,9 @@ namespace Menu
                 var dataSplit = dataLine.Split(':');
                 switch (dataSplit[0])
                 {
+                    case "client_id":
+                        ClientId = ulong.Parse(dataSplit[1]);
+                        break;
                     case "ping":
                         Ping = int.Parse(dataSplit[1]);
                         break;
@@ -206,7 +242,8 @@ namespace Menu
         {
             return "steam_id:" + SteamId + ";"
                    + "display_name:" + DisplayName + ";"
-                   + "ping:" + Ping + ";";
+                   + "ping:" + Ping + ";"
+                   + "client_id:" + ClientId + ";";
         }
     }
 }
