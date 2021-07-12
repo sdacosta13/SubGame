@@ -40,6 +40,7 @@ namespace Menu
 
             if (_frame >= 30)
             {
+                // ping updates every 30 frames
                 if (IsServer)
                 {
                     UpdateClientsPing();
@@ -160,7 +161,7 @@ namespace Menu
                 var go = Instantiate(ConListPrefab, ConList.transform);
                 _conListItems[temp.ClientId] = go;
                 go.GetComponent<ClientListEntry>().displayName.text = temp.DisplayName;
-                go.GetComponent<ClientListEntry>().UpdatePing(temp.Ping);
+                go.GetComponent<ClientListEntry>().SetPing(temp.Ping);
                 // set some values in list
             }
         }
@@ -185,12 +186,17 @@ namespace Menu
             foreach (var client in clientList)
             {
                 _conListData[ulong.Parse(client[0])].Ping = int.Parse(client[1]);
-                _conListItems[ulong.Parse(client[0])].GetComponent<ClientListEntry>().UpdatePing(client[1]);
+                _conListItems[ulong.Parse(client[0])].GetComponent<ClientListEntry>().SetPing(client[1]);
             }
         }
 
         private void OnServerStart()
         {
+            if (IsServer)
+            {
+                _conListData.Clear();
+                _conListItems.Clear();
+            }
             if (IsHost)
             {
                 _conListData[NetworkManager.LocalClientId] =

@@ -9,11 +9,11 @@ public class ClientListEntry : MonoBehaviour
     [SerializeField]
     private TextMeshProUGUI ping;
 
-    public void UpdatePing(string pingVal)
+    public void SetPing(string pingVal)
     {
         ping.text = "Ping: " + pingVal;
     }
-    public void UpdatePing(int pingVal)
+    public void SetPing(int pingVal)
     {
         ping.text = "Ping: " + pingVal;
     }
