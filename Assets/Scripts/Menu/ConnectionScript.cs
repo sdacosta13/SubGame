@@ -4,7 +4,6 @@ using System.Linq;
 using MLAPI;
 using MLAPI.Messaging;
 using MLAPI.Spawning;
-using TMPro;
 using UnityEngine;
 
 namespace Menu
@@ -14,9 +13,14 @@ namespace Menu
         public GameObject ConListPrefab;
         public GameObject ConList;
 
+        private int _frame = 0;
+
         // server/host maintains a dictionary of clientIds against a string of data to send to all clients every frame
         // string contains username: , ping: , etc.
-        private readonly Dictionary<ulong, ConData> _conListItems = new Dictionary<ulong, ConData>();
+        private readonly Dictionary<ulong, ConData> _conListData = new Dictionary<ulong, ConData>();
+
+        // dictionary so that ConList items can be update without destruction maintained by all clients
+        private readonly Dictionary<ulong, GameObject> _conListItems = new Dictionary<ulong, GameObject>();
 
         private void Start()
         {
@@ -32,33 +36,17 @@ namespace Menu
 
         private void Update()
         {
-            // if (IsServer)
-            // {
-            //     var connectedClients = new HashSet<ulong>(NetworkManager.ConnectedClients.Keys);
-            //     if (!connectedClients.SetEquals(_conListItems.Keys))
-            //     {
-            //         Debug.Log("===========================================");
-            //         foreach (var client in connectedClients)
-            //         {
-            //             Debug.Log("Client: " + client);
-            //         }
-            //         Debug.Log("--------------------------------------------");
-            //         foreach (var client in _conListItems)
-            //         {
-            //             Debug.Log("Think Client: " + client.Key + " with " + client.Value);
-            //         }
-            //         Debug.Log("===========================================");
-            //         var diff = connectedClients.Except(_conListItems.Keys);
-            //         var removed = false;
-            //         // foreach (var conn in diff)
-            //         // {
-            //         //     removed |= _conListItems.Remove(conn);
-            //         // }
-            //         
-            //
-            //         if (removed) UpdateClientListClientRpc(GetAllConDataAsString());
-            //     }
-            // }
+            _frame++;
+
+            if (_frame >= 30)
+            {
+                if (IsServer)
+                {
+                    UpdateClientsPing();
+                }
+
+                _frame = 0;
+            }
         }
 
         public void Connect(string netType)
@@ -144,7 +132,7 @@ namespace Menu
         {
             Debug.Log("Received new clients data");
             var cData = new ConData(clientData);
-            _conListItems[cData.ClientId] = cData;
+            _conListData[cData.ClientId] = cData;
             var allCondDataStr = GetAllConDataAsString();
             Debug.Log("Client data after aggregate: " + allCondDataStr);
             UpdateClientListClientRpc(allCondDataStr);
@@ -155,7 +143,7 @@ namespace Menu
         {
             // this is also received by the host client
             Debug.Log("Remaking client data list");
-            _conListItems.Clear();
+            _conListData.Clear();
 
             // remove all
             foreach (Transform child in ConList.transform)
@@ -168,16 +156,36 @@ namespace Menu
                 StringSplitOptions.RemoveEmptyEntries))
             {
                 var temp = new ConData(clientData);
-                _conListItems[temp.ClientId] = temp;
+                _conListData[temp.ClientId] = temp;
                 var go = Instantiate(ConListPrefab, ConList.transform);
-                foreach (Transform child in go.transform)
-                {
-                    if (child.gameObject.name == "ClientName")
-                        child.gameObject.GetComponent<TextMeshProUGUI>().text = temp.DisplayName;
-                    else if (child.gameObject.name == "ClientPing")
-                        child.gameObject.GetComponent<TextMeshProUGUI>().text = temp.Ping.ToString();
-                }
+                _conListItems[temp.ClientId] = go;
+                go.GetComponent<ClientListEntry>().displayName.text = temp.DisplayName;
+                go.GetComponent<ClientListEntry>().UpdatePing(temp.Ping);
                 // set some values in list
+            }
+        }
+
+        private void UpdateClientsPing()
+        {
+            var clientPingStr = "";
+            foreach (var client in NetworkManager.ConnectedClients)
+                clientPingStr += client.Key + ":" +
+                                 NetworkManager.NetworkConfig.NetworkTransport.GetCurrentRtt(client.Key) + ";";
+
+            UpdateClientPingDisplayClientRpc(clientPingStr);
+        }
+
+        [ClientRpc]
+        private void UpdateClientPingDisplayClientRpc(string clientPingStr)
+        {
+            // parse string
+            var clientList = clientPingStr.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries)
+                .Select(a => a.Split(new[] {':'}, StringSplitOptions.RemoveEmptyEntries));
+
+            foreach (var client in clientList)
+            {
+                _conListData[ulong.Parse(client[0])].Ping = int.Parse(client[1]);
+                _conListItems[ulong.Parse(client[0])].GetComponent<ClientListEntry>().UpdatePing(client[1]);
             }
         }
 
@@ -185,13 +193,13 @@ namespace Menu
         {
             if (IsHost)
             {
-                _conListItems[NetworkManager.LocalClientId] =
+                _conListData[NetworkManager.LocalClientId] =
                     new ConData(NetworkManager.LocalClientId, "steam121", "ciaran");
                 UpdateClientListClientRpc(GetAllConDataAsString());
             }
         }
 
-    private void OnClientConnect(ulong id)
+        private void OnClientConnect(ulong id)
         {
             if (IsClient)
             {
@@ -218,7 +226,7 @@ namespace Menu
         {
             if (IsServer || IsHost)
             {
-                _conListItems.Remove(id);
+                _conListData.Remove(id);
                 Debug.Log("Client " + id + " disconnected from server");
                 UpdateClientListClientRpc(GetAllConDataAsString());
             }
@@ -229,25 +237,25 @@ namespace Menu
         // only ever call this on server
         private string GetAllConDataAsString()
         {
-            return _conListItems.Aggregate("",
+            return _conListData.Aggregate("",
                 (current, conData) => current + (conData.Value + Environment.NewLine));
         }
     }
 
-    public struct ConData
+    public class ConData
     {
         public ulong ClientId { get; private set; }
         public int Ping { get; set; }
         public string SteamId { get; private set; }
         public string DisplayName { get; set; }
-        
-        public ConData(ulong clientId, string steamId, string displayName) : this()
+
+        public ConData(ulong clientId, string steamId, string displayName)
         {
             ClientId = clientId;
             SteamId = steamId;
             DisplayName = displayName;
         }
-        
+
         public ConData(string data) : this(data.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries))
         {
             Debug.Log(data);
