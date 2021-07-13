@@ -1,9 +1,8 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using UnityEngine;
+using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 public class Chunk
@@ -23,21 +22,25 @@ public class Chunk
         public bool done;
         #nullable disable
     }
-    public MeshData meshData = new MeshData();
+    public MeshData meshData;
     public Vector3 pos;
-    private string path = Application.persistentDataPath;
-    public Chunk(Vector3 _pos)
+    //private string path = Application.persistentDataPath;
+
+    public Chunk(Vector3 _pos, bool doGenerate = false)
     {
         pos = _pos;
         meshData.vertices = new List<Vector3>();
         meshData.triangles = new List<int>();
+        if (doGenerate) Generate();
     }
+    
     public override string ToString()
     {
-        return pos.x.ToString() + "@" + pos.y.ToString() + "@" + pos.z.ToString();
+        return pos.x + "@" + pos.y + "@" + pos.z;
     }
     public void Generate()
     {
+        Profiler.BeginSample("Generating chunk");
         if (Constants.generateViaShaderCompute)
         {
             GenerateViaShaderCompute();
@@ -45,18 +48,22 @@ public class Chunk
         }
         else
         {
-            Marching m = new Marching(pos);
+            Profiler.BeginSample("Marching instantiate");
+            var m = new Marching(pos);
+            Profiler.EndSample();
+            Profiler.BeginSample("Creating mesh data");
             m.CreateMeshData();
-            this.meshData.vertices = m.vertices;
-            this.meshData.triangles = m.triangles;
-            this.meshData.normals = m.normals;
-            this.meshData.done = true;
+            Profiler.EndSample();
+            meshData.vertices = m.vertices;
+            meshData.triangles = m.triangles;
+            meshData.normals = m.normals;
+            meshData.done = true;
             //string json = JsonUtility.ToJson(meshData);
             //Directory.CreateDirectory(path + "/" +  Constants.levelName);
             //FileOperator.Write(path + "/" + Constants.levelName+ "/" + ToString() + ".json", json);
             //Debug.Log("Chunk " + pos.ToString() + " Complete");
         }
-
+        Profiler.EndSample();
     }
     public void TryToSetMesh()
     {

@@ -1,56 +1,88 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 public class ChunkManager
 {
-    private Dictionary<Vector3, Chunk> chunks;
-    public Dictionary<Vector3, Thread> threads;
+    private Dictionary<Vector3, Chunk> _chunks;
+    public Dictionary<Vector3, Thread> Threads;
+    public Dictionary<Vector3, bool> ChunkState;
+
     public ChunkManager()
     {
-        chunks = new Dictionary<Vector3, Chunk>();
-        threads = new Dictionary<Vector3, Thread>();
+        _chunks = new Dictionary<Vector3, Chunk>();
+        Threads = new Dictionary<Vector3, Thread>();
+        ChunkState = new Dictionary<Vector3, bool>();
     }
-    public bool chunkExists(Vector3 pos)
-    {
-        return chunks.ContainsKey(pos);
-    }
-    public bool chunkComplete(Vector3 pos)
-    {
-        return chunks[pos].meshData.done;
-    }
-    public Chunk GetChunk(Vector3 pos)
-    {
-        return chunks[pos];
-    }
+
+    public bool ChunkExists(Vector3 pos) => _chunks.ContainsKey(pos);
+    public bool ChunkComplete(Vector3 pos) => _chunks[pos].meshData.done;
+    public Chunk GetChunk(Vector3 pos) => _chunks[pos];
+
     public void CreateChunk(Vector3 pos)
     {
+        Profiler.BeginSample("Start Create");
         if (Constants.generateViaShaderCompute)
         {
-            Chunk c = new Chunk(pos);
-            chunks[pos] = c;
+            Profiler.BeginSample("ShaderCompute");
+            var c = new Chunk(pos);
+            _chunks[pos] = c;
             c.Generate();
+            Profiler.EndSample();
         }
         else
         {
-            if (!threads.ContainsKey(pos))
+            Profiler.BeginSample("CPU generation");
+            if (!Threads.ContainsKey(pos))
             {
-                Chunk c = new Chunk(pos);
-                chunks[pos] = c;
-                Thread th = new Thread(c.Generate);
+                Profiler.BeginSample("Chunk Instantiation");
+                var c = new Chunk(pos);
+                _chunks[pos] = c;
+                Profiler.EndSample();
+                Profiler.BeginSample("Thread creation");
+                var th = new Thread(c.Generate);
                 th.Priority = System.Threading.ThreadPriority.BelowNormal;
-                th.Name = pos.ToString() + " Chunk Generator";
+                th.Name = pos + " Chunk Generator";
+                Profiler.EndSample();
+                Profiler.BeginSample("Thread starting");
                 th.Start();
-                threads[pos] = th;
+                Threads[pos] = th;
+                Profiler.EndSample();
             }
-        }
-        
 
+            Profiler.EndSample();
+        }
+
+        Profiler.EndSample();
     }
+
+    public void CreateChunkWithTask(Vector3 pos)
+    {
+        ChunkState[pos] = false;
+        Task.Run(() => new Chunk(pos, true))
+            .ContinueWith(chunkTask => _chunks[chunkTask.Result.pos] = chunkTask.Result)
+            .ContinueWith(x => ChunkState[x.Result.pos] = true);
+        
+    }
+
+    public void CreateChunk2(Vector3 pos)
+    {
+        Profiler.BeginSample("Chunk");
+        Profiler.BeginSample("Instantiating chunk");
+        var c = new Chunk(pos);
+        _chunks[pos] = c;
+        Profiler.EndSample();
+        c.Generate();
+        Profiler.EndSample();
+    }
+
     public void Destroy()
     {
-        foreach(Chunk c in chunks.Values)
+        foreach (var c in _chunks.Values)
         {
             c.Destroy();
         }
