@@ -11,38 +11,29 @@ using Debug = UnityEngine.Debug;
 
 public class Marching
 {
-    float threshold = 0.2f;
-    int chunkSize = Constants.chunkSize;
-    bool[,,] terrainMap;
-    static System.Random r = new System.Random();
-    public List<Vector3> vertices = new List<Vector3>(32 * 32 * 32);
-    public List<int> triangles = new List<int>(32 * 32 * 32);
-    public Vector3[] normals;
-    private Vector3 offset;
-    private FastNoiseLite fnl;
+    float _threshold = 0.2f;
+    int _chunkSize = Constants.chunkSize;
+    bool[,,] _terrainMap;
+    static System.Random _r = new System.Random();
+    public List<Vector3> Vertices = new List<Vector3>(32 * 32 * 32);
+    public List<int> Triangles = new List<int>(32 * 32 * 32);
+    public Vector3[] Normals;
+    private Vector3 _offset;
+    private FastNoiseLite _fnl;
 
     public Marching(Vector3 pos)
     {
-        offset = pos;
-        fnl = new FastNoiseLite(HashLevelName());
+        _offset = pos;
+        _fnl = new FastNoiseLite(HashLevelName());
     }
 
-    void PrintTerrain()
+    public void PrintTerrain()
     {
         var s = "";
-        for (var x = 0; x < chunkSize; x++)
+        for (var x = 0; x < _chunkSize; x++)
         {
-            for (var z = 0; z < chunkSize; z++)
-            {
-                if (terrainMap[x, 0, z])
-                {
-                    s += "1";
-                }
-                else
-                {
-                    s += "0";
-                }
-            }
+            for (var z = 0; z < _chunkSize; z++)
+                s += _terrainMap[x, 0, z] ? "1" : "0";
 
             s += "\n";
         }
@@ -51,28 +42,29 @@ public class Marching
         throw new Exception();
     }
 
-    void PopulateTerrain()
+    private void PopulateTerrain()
     {
         Profiler.BeginSample("Wiping array");
-        terrainMap = new bool[chunkSize + 1, chunkSize + 1, chunkSize + 1];
+        _terrainMap = new bool[_chunkSize + 1, _chunkSize + 1, _chunkSize + 1];
         Profiler.EndSample();
         Profiler.BeginSample("Loop start");
-        for (var x = 0; x < chunkSize + 1; x++)
+        for (var x = 0; x < _chunkSize + 1; x++)
         {
-            for (var z = 0; z < chunkSize + 1; z++)
+            for (var z = 0; z < _chunkSize + 1; z++)
             {
-                for (var y = 0; y < chunkSize + 1; y++)
+                for (var y = 0; y < _chunkSize + 1; y++)
                 {
                     Profiler.BeginSample("Perlin gen");
-                    //var val = Perlin3D(new Vector3(x, y, z));
-                    var val = fnl.GetNoise(x + offset.x, y + offset.y, z + offset.z);
-                    Profiler.EndSample();
-                    Profiler.BeginSample("Assigning val");
-                    if (val > threshold)
-                    {
-                        terrainMap[x, y, z] = true;
-                    }
+                    // //var val = Perlin3D(new Vector3(x, y, z));
+                    // var val = fnl.GetNoise(x + offset.x, y + offset.y, z + offset.z);
+                    // Profiler.EndSample();
+                    // Profiler.BeginSample("Assigning val");
+                    // if (val > threshold)
+                    // {
+                    //     terrainMap[x, y, z] = true;
+                    // }
 
+                    _terrainMap[x, y, z] = _fnl.GetNoise(x + _offset.x, y + _offset.y, z + _offset.z) > _threshold;
                     Profiler.EndSample();
                 }
             }
@@ -81,14 +73,13 @@ public class Marching
         Profiler.EndSample();
     }
 
-    private int HashLevelName()
+    int HashLevelName()
     {
         var sum = 1;
         var bs = Encoding.ASCII.GetBytes(Constants.levelName);
+
         foreach (var b in bs)
-        {
             sum *= b;
-        }
 
         sum %= int.MaxValue;
         return sum;
@@ -99,11 +90,11 @@ public class Marching
         // Profiler.BeginSample("Instantiate FNL");
         // var f = new FastNoiseLite(HashLevelName());
         // Profiler.EndSample();
-        coord += offset;
-        return fnl.GetNoise(coord.x, coord.y, coord.z);
+        coord += _offset;
+        return _fnl.GetNoise(coord.x, coord.y, coord.z);
     }
 
-    public static int debugcount = 100;
+    public static int Debugcount = 100;
 
     /*private static float Perlin3D(Vector3 coord)
     {
@@ -116,22 +107,21 @@ public class Marching
         Profiler.BeginSample("Populating terrain");
         PopulateTerrain();
         Profiler.EndSample();
+
         // Loop through each "cube" in our terrain.
-
         Profiler.BeginSample("Marching cubes");
-
         var cube = new bool[8];
-        for (var x = 0; x < chunkSize; x++)
+        for (var x = 0; x < _chunkSize; x++)
         {
-            for (var y = 0; y < chunkSize; y++)
+            for (var y = 0; y < _chunkSize; y++)
             {
-                for (var z = 0; z < chunkSize; z++)
+                for (var z = 0; z < _chunkSize; z++)
                 {
                     // Create an array of floats representing each corner of a cube and get the value from our terrainMap.
                     for (var i = 0; i < 8; i++)
                     {
                         var corner = new Vector3Int(x, y, z) + Constants.CornerTable[i];
-                        cube[i] = terrainMap[corner.x, corner.y, corner.z];
+                        cube[i] = _terrainMap[corner.x, corner.y, corner.z];
                     }
 
                     // Pass the value into our MarchCube function.
@@ -143,9 +133,11 @@ public class Marching
         }
 
         Profiler.EndSample();
+
         Profiler.BeginSample("Calc normals");
         CalculateNormals();
         Profiler.EndSample();
+
         stopwatch.Stop();
         Debug.Log("Time taken to generate mesh data: " + stopwatch.ElapsedMilliseconds + "ms");
     }
@@ -181,37 +173,37 @@ public class Marching
             var vertPosition = (vert1 + vert2) / 2f;
 
             // Add to our vertices and triangles list and incremement the edgeIndex.
-            vertices.Add(vertPosition + offset);
-            triangles.Add(vertices.Count - 1);
+            Vertices.Add(vertPosition + _offset);
+            Triangles.Add(Vertices.Count - 1);
             edgeIndex++;
         }
     }
 
     void CalculateNormals()
     {
-        normals = new Vector3[vertices.Count];
-        for (var i = 0; i < triangles.Count; i += 3)
+        Normals = new Vector3[Vertices.Count];
+        for (var i = 0; i < Triangles.Count; i += 3)
         {
-            var vertA = triangles[i + 0];
-            var vertB = triangles[i + 1];
-            var vertC = triangles[i + 2];
+            var vertA = Triangles[i + 0];
+            var vertB = Triangles[i + 1];
+            var vertC = Triangles[i + 2];
             var surfaceNorm = SurfaceNormalFromIndices(vertA, vertB, vertC);
-            normals[vertA] += surfaceNorm;
-            normals[vertB] += surfaceNorm;
-            normals[vertC] += surfaceNorm;
+            Normals[vertA] += surfaceNorm;
+            Normals[vertB] += surfaceNorm;
+            Normals[vertC] += surfaceNorm;
         }
 
-        for (var i = 0; i < normals.Length; i++)
+        for (var i = 0; i < Normals.Length; i++)
         {
-            normals[i].Normalize();
+            Normals[i].Normalize();
         }
     }
 
-    Vector3 SurfaceNormalFromIndices(int A, int B, int C)
+    Vector3 SurfaceNormalFromIndices(int a, int b, int c)
     {
-        var pointA = vertices[A];
-        var pointB = vertices[B];
-        var pointC = vertices[C];
+        var pointA = Vertices[a];
+        var pointB = Vertices[b];
+        var pointC = Vertices[c];
         return Vector3.Cross(pointB - pointA, pointC - pointA).normalized;
     }
 
