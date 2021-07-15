@@ -8,6 +8,8 @@ namespace Menu
 
         public static string NetType = "host";
         public static string EnteredPass = "";
+        public static string EnteredPort = "";
+        public static string EnteredIp = "";
 
         public Canvas[] menus;
         
@@ -77,6 +79,16 @@ namespace Menu
                 if (menu.name != "PlayMenu") continue;
                 menu.gameObject.SetActive(true);
             }
+        }
+
+        public void UpdateConnectionIp(string text)
+        {
+            EnteredIp = text;
+        }
+
+        public void UpdateConnectionPort(string text)
+        {
+            EnteredPort = text;
         }
 
         public void UpdatePassword(string text)

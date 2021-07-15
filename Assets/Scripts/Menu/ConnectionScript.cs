@@ -4,6 +4,7 @@ using System.Linq;
 using MLAPI;
 using MLAPI.Messaging;
 using MLAPI.Spawning;
+using MLAPI.Transports.UNET;
 using UnityEngine;
 
 namespace Menu
@@ -30,7 +31,7 @@ namespace Menu
             // stuff to do when the server has finished starting
             NetworkManager.Singleton.OnServerStarted += OnServerStart;
 
-            //NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
+            NetworkManager.Singleton.NetworkConfig.ConnectionApproval = true;
             NetworkManager.Singleton.ConnectionApprovalCallback += ApprovalCheck;
         }
 
@@ -53,6 +54,9 @@ namespace Menu
         public void Connect(string netType)
         {
             Debug.Log("Trying to start with " + netType);
+            // if (MainMenu.EnteredPort != "" && int.TryParse(MainMenu.EnteredPort, out var port))
+            //     NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = port;
+            
             switch (netType)
             {
                 case "server":
@@ -66,12 +70,12 @@ namespace Menu
                     break;
                 case "client":
                     Debug.Log("client");
-                    // to set up connection (is local machine by default)
-                    // NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = "127.0.0.1";
-                    // NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = 7777;
-
-                    // NetworkManager.Singleton.NetworkConfig.ConnectionData =
-                    //     System.Text.Encoding.Default.GetBytes("password:" + MainMenu.EnteredPass);
+                    // do some format check for ip
+                    // if (MainMenu.EnteredIp != "")
+                    //     NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = MainMenu.EnteredIp;
+                        
+                    NetworkManager.Singleton.NetworkConfig.ConnectionData =
+                        System.Text.Encoding.Default.GetBytes("password:" + MainMenu.EnteredPass);
                     NetworkManager.Singleton.StartClient();
                     break;
             }
