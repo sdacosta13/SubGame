@@ -17,4 +17,9 @@ public class ClientListEntry : MonoBehaviour
     {
         ping.text = "Ping: " + pingVal;
     }
+    
+    public void SetPing(ulong pingVal)
+    {
+        ping.text = "Ping: " + pingVal;
+    }
 }

@@ -39,9 +39,9 @@ namespace Menu
         {
             _frame++;
 
-            if (_frame >= 30)
+            if (_frame >= 60)
             {
-                // ping updates every 30 frames
+                // ping updates every 60 frames
                 if (IsServer)
                 {
                     UpdateClientsPing();
@@ -54,26 +54,40 @@ namespace Menu
         public void Connect(string netType)
         {
             Debug.Log("Trying to start with " + netType);
-            // if (MainMenu.EnteredPort != "" && int.TryParse(MainMenu.EnteredPort, out var port))
-            //     NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = port;
-            
+
             switch (netType)
             {
                 case "server":
                     Debug.Log("server");
+                    
+                    if (MainMenu.EnteredPort != "" && int.TryParse(MainMenu.EnteredPort, out var serverPort))
+                        NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = serverPort;
+                    Debug.Log("Port: " + NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort);
+                    
                     NetworkManager.Singleton.StartServer();
                     break;
                 case "host":
                     Debug.Log("host");
+                    
+                    if (MainMenu.EnteredPort != "" && int.TryParse(MainMenu.EnteredPort, out var hostPort))
+                        NetworkManager.Singleton.GetComponent<UNetTransport>().ServerListenPort = hostPort;
+                    Debug.Log("Port: " + NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort);
+                    
                     NetworkManager.Singleton.StartHost();
                     // set up ConData for host client - steamId etc
                     break;
                 case "client":
                     Debug.Log("client");
+                    
                     // do some format check for ip
-                    // if (MainMenu.EnteredIp != "")
-                    //     NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = MainMenu.EnteredIp;
-                        
+                    if (MainMenu.EnteredIp != "")
+                        NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress = MainMenu.EnteredIp;
+                    Debug.Log("Ip: " + NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectAddress);
+                    
+                    if (MainMenu.EnteredPort != "" && int.TryParse(MainMenu.EnteredPort, out var port))
+                        NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort = port;
+                    Debug.Log("Port: " + NetworkManager.Singleton.GetComponent<UNetTransport>().ConnectPort);
+                    
                     NetworkManager.Singleton.NetworkConfig.ConnectionData =
                         System.Text.Encoding.Default.GetBytes("password:" + MainMenu.EnteredPass);
                     NetworkManager.Singleton.StartClient();
@@ -103,6 +117,8 @@ namespace Menu
                         break;
                 }
             }
+            
+            Debug.Log("Approved?: " + approve);
 
             // maybe decide this with operation loop
             ulong? prefabHash = NetworkSpawnManager.GetPrefabHashFromGenerator("Player");
@@ -147,7 +163,7 @@ namespace Menu
         private void UpdateClientListClientRpc(string allClientData)
         {
             // this is also received by the host client
-            Debug.Log("Remaking client data list");
+            // Debug.Log("Remaking client data list");
             _conListData.Clear();
 
             // remove all
@@ -172,26 +188,9 @@ namespace Menu
 
         private void UpdateClientsPing()
         {
-            var clientPingStr = "";
-            foreach (var client in NetworkManager.ConnectedClients)
-                clientPingStr += client.Key + ":" +
-                                 NetworkManager.NetworkConfig.NetworkTransport.GetCurrentRtt(client.Key) + ";";
-
-            UpdateClientPingDisplayClientRpc(clientPingStr);
-        }
-
-        [ClientRpc]
-        private void UpdateClientPingDisplayClientRpc(string clientPingStr)
-        {
-            // parse string
-            var clientList = clientPingStr.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries)
-                .Select(a => a.Split(new[] {':'}, StringSplitOptions.RemoveEmptyEntries));
-
-            foreach (var client in clientList)
-            {
-                _conListData[ulong.Parse(client[0])].Ping = int.Parse(client[1]);
-                _conListItems[ulong.Parse(client[0])].GetComponent<ClientListEntry>().SetPing(client[1]);
-            }
+            foreach (var client in _conListData)
+                _conListData[client.Key].Ping = NetworkManager.NetworkConfig.NetworkTransport.GetCurrentRtt(client.Key);
+            UpdateClientListClientRpc(GetAllConDataAsString());
         }
 
         private void OnServerStart()
@@ -201,6 +200,7 @@ namespace Menu
                 _conListData.Clear();
                 _conListItems.Clear();
             }
+
             if (IsHost)
             {
                 _conListData[NetworkManager.LocalClientId] =
@@ -255,7 +255,7 @@ namespace Menu
     public class ConData
     {
         public ulong ClientId { get; private set; }
-        public int Ping { get; set; }
+        public ulong Ping { get; set; }
         public string SteamId { get; private set; }
         public string DisplayName { get; set; }
 
@@ -268,7 +268,7 @@ namespace Menu
 
         public ConData(string data) : this(data.Split(new[] {';'}, StringSplitOptions.RemoveEmptyEntries))
         {
-            Debug.Log(data);
+            // Debug.Log(data);
         }
 
         public ConData(IEnumerable<string> data)
@@ -287,7 +287,7 @@ namespace Menu
                         ClientId = ulong.Parse(dataSplit[1]);
                         break;
                     case "ping":
-                        Ping = int.Parse(dataSplit[1]);
+                        Ping = ulong.Parse(dataSplit[1]);
                         break;
                     case "steam_id":
                         SteamId = dataSplit[1];

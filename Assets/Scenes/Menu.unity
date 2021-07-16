@@ -2351,8 +2351,8 @@ MonoBehaviour:
   m_OnEndEdit:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: MainMenu, Assembly-CSharp
+      - m_Target: {fileID: 1638235849}
+        m_TargetAssemblyTypeName: Menu.MainMenu, Assembly-CSharp
         m_MethodName: UpdatePassword
         m_Mode: 0
         m_Arguments:
