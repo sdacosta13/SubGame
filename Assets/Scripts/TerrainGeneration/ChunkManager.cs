@@ -37,10 +37,10 @@ public class ChunkManager
             Profiler.BeginSample("CPU generation");
             if (TerrainHandler.DoThreading){
                 ChunkState[pos] = false;
+                _chunks[pos] = new Chunk(pos);
                 Profiler.BeginSample("Chunk, threaded");
-                Task.Run(() => new Chunk(pos, true))
-                    .ContinueWith(chunkTask => _chunks[chunkTask.Result.Pos] = chunkTask.Result)
-                    .ContinueWith(task => ChunkState[task.Result.Pos] = true);
+                Task.Run(() => _chunks[pos].Generate())
+                    .ContinueWith(task => ChunkState[pos] = true);
                 Profiler.EndSample();
             }
             else

@@ -14,18 +14,21 @@ public class Chunk
     ComputeBuffer triangles;
     ComputeBuffer vertices;
     ComputeShader cs;
+
     public struct MeshData
     {
         // ? means it is nullable
-        #nullable enable
+#nullable enable
         public List<Vector3>? Vertices;
         public List<int>? Triangles;
         public Vector3[] Normals;
         public bool done;
-        #nullable disable
+#nullable disable
     }
+
     public MeshData meshData;
     public Vector3 Pos;
+
     private FastNoiseLite _fnl = new FastNoiseLite(HashLevelName());
     //private string path = Application.persistentDataPath;
 
@@ -36,12 +39,12 @@ public class Chunk
         meshData.Triangles = new List<int>();
         if (doGenerate) Generate();
     }
-    
+
     public override string ToString()
     {
         return Pos.x + "@" + Pos.y + "@" + Pos.z;
     }
-    
+
     public void Generate()
     {
         Profiler.BeginSample("Generating chunk");
@@ -52,10 +55,6 @@ public class Chunk
         }
         else
         {
-            Profiler.BeginSample("Marching instantiate");
-            var m = new Marching(Pos);
-            Profiler.EndSample();
-            
             Profiler.BeginSample("Creating mesh data");
             CreateMeshData();
             meshData.done = true;
@@ -66,6 +65,7 @@ public class Chunk
             //FileOperator.Write(path + "/" + Constants.levelName+ "/" + ToString() + ".json", json);
             //Debug.Log("Chunk " + pos.ToString() + " Complete");
         }
+
         Profiler.EndSample();
     }
 
@@ -84,20 +84,20 @@ public class Chunk
                     meshData.Vertices.Add(vec);
                 }
             }
+
             var tris = new int[32 * 32 * 32 * 15 * 3];
             triangles.GetData(tris);
             foreach (var tri in tris)
             {
                 meshData.Triangles.Add(tri);
             }
+
             meshData.done = true;
         }
-        catch(Exception)
+        catch (Exception)
         {
             meshData.done = false;
         }
-        
-        
     }
 
     private void GenerateViaShaderCompute()
@@ -108,7 +108,7 @@ public class Chunk
         boolData.SetData(GetPerlinData());
         triangles = new ComputeBuffer(32 * 32 * 32 * 15 * 3 * 3, sizeof(int));
         vertices = new ComputeBuffer(32 * 32 * 32 * 15 * 3, sizeof(float));
-        int[] boolInt = { 0 };
+        int[] boolInt = {0};
         var kernelIndex = 0;
         cs = Resources.Load<ComputeShader>("ChunkGenerator");
         cs.GetKernelThreadGroupSizes(kernelIndex, out _, out _, out _);
@@ -124,36 +124,39 @@ public class Chunk
     private int[,,] GetPerlinData()
     {
         var pd = new int[Constants.chunkSize + 1, Constants.chunkSize + 1, Constants.chunkSize + 1];
-        for(var x = 0; x < Constants.chunkSize + 1; x++)
+        for (var x = 0; x < Constants.chunkSize + 1; x++)
         {
-            for(var z = 0; z < Constants.chunkSize + 1; z++)
+            for (var z = 0; z < Constants.chunkSize + 1; z++)
             {
-                for(var y = 0; y < Constants.chunkSize + 1; y++)
+                for (var y = 0; y < Constants.chunkSize + 1; y++)
                 {
                     if (Perlin3D(new Vector3(x, y, z)) > Constants.perlinThreshold) pd[x, y, z] = 1;
                     else pd[x, y, z] = 0;
                 }
             }
         }
+
         return pd;
     }
+
     private static int HashLevelName()
     {
         var sum = 1;
         var bs = Encoding.ASCII.GetBytes(Constants.levelName);
         foreach (var b in bs)
             sum *= b;
-        
+
         sum %= int.MaxValue;
         return sum;
     }
+
     private float Perlin3D(Vector3 coord)
     {
         var f = new FastNoiseLite(HashLevelName());
         coord += Pos;
         return f.GetNoise(coord.x, coord.y, coord.z);
-
     }
+
     public void Destroy()
     {
         tcTable?.Dispose();
@@ -162,10 +165,10 @@ public class Chunk
         vertices?.Dispose();
     }
 
-    
-    
+
     // moved code to reduce objects
     // probably most optimisation needs to happen here somehow
+
     #region marching code
 
     private bool[,,] _terrainMap;
@@ -173,8 +176,6 @@ public class Chunk
 
     private void CreateMeshData()
     {
-        var stopwatch = new Stopwatch();
-        stopwatch.Start();
         Profiler.BeginSample("Populating terrain");
         PopulateTerrain();
         Profiler.EndSample();
@@ -188,36 +189,43 @@ public class Chunk
             {
                 for (var z = 0; z < Constants.chunkSize; z++)
                 {
+                    // code in here runs around 32768 times per chunk
+                    // so around 4m times on start
+                    // maybe try 16x16x16 chunks
+                    
                     // Create an array of floats representing each corner of a cube and get the value from our terrainMap.
+                    Profiler.BeginSample("Corner stuff");
+                    var vec = new Vector3Int(x, y, z);
+
                     for (var i = 0; i < 8; i++)
                     {
-                        var corner = new Vector3Int(x, y, z) + Constants.CornerTable[i];
+                        var corner = vec + Constants.CornerTable[i];
                         cube[i] = _terrainMap[corner.x, corner.y, corner.z];
                     }
+                    Profiler.EndSample();
 
                     // Pass the value into our MarchCube function.
                     Profiler.BeginSample("Marching a Cube");
-                    MarchCube(new Vector3(x, y, z), cube);
+                    MarchCube(vec, cube);
                     Profiler.EndSample();
                 }
             }
         }
+
         Profiler.EndSample();
 
         Profiler.BeginSample("Calc normals");
         CalculateNormals();
         Profiler.EndSample();
-
-        stopwatch.Stop();
-        Debug.Log("Time taken to generate mesh data: " + stopwatch.ElapsedMilliseconds + "ms");
     }
-    
+
     private void PopulateTerrain()
     {
+        // only way to improve this seems to be changing the noise type or by changing lib (maybe FastNoise2)
         Profiler.BeginSample("Wiping array");
         _terrainMap = new bool[Constants.chunkSize + 1, Constants.chunkSize + 1, Constants.chunkSize + 1];
         Profiler.EndSample();
-        
+
         Profiler.BeginSample("Loop start");
         for (var x = 0; x < Constants.chunkSize + 1; x++)
         {
@@ -231,6 +239,7 @@ public class Chunk
                 }
             }
         }
+
         Profiler.EndSample();
     }
 
@@ -245,28 +254,26 @@ public class Chunk
 
         // Loop through the triangles. There are never more than 5 triangles to a cube and only three vertices to a triangle.
         // 3 * 5 = 15, so loop 15 times
-        var edgeIndex = 0;
-        for (var i = 0; i < 15; i++)
+        for (var edgeIndex = 0; edgeIndex < 15; edgeIndex++)
         {
             // Get the current indice. We increment triangleIndex through each loop.
-            var indice = Constants.TriangleTable[configIndex, edgeIndex];
+            var index = Constants.TriangleTable[configIndex, edgeIndex];
 
             // If the current edgeIndex is -1, there are no more indices and we can exit the function.
 
-            if (indice == -1)
+            if (index == -1)
                 return;
 
             // Get the vertices for the start and end of this edge.
-            var vert1 = position + Constants.EdgeTable[indice, 0];
-            var vert2 = position + Constants.EdgeTable[indice, 1];
+            var vert1 = position + Constants.EdgeTable[index, 0];
+            var vert2 = position + Constants.EdgeTable[index, 1];
 
             // Get the midpoint of this edge.
-            var vertPosition = (vert1 + vert2) / 2f;
+            //var vertPosition = (vert1 + vert2) / 2f;
 
             // Add to our vertices and triangles list and incremement the edgeIndex.
-            meshData.Vertices.Add(vertPosition + Pos);
-            meshData.Triangles.Add(meshData.Vertices.Count - 1);
-            edgeIndex++;
+            meshData.Triangles.Add(meshData.Vertices.Count);
+            meshData.Vertices.Add((vert1 + vert2) / 2f + Pos);
         }
     }
 
@@ -298,9 +305,7 @@ public class Chunk
         for (var i = 0; i < 8; i++)
         {
             if (cube[i])
-            {
                 configurationIndex += adder[i];
-            }
         }
 
         return configurationIndex;
@@ -313,7 +318,6 @@ public class Chunk
         var pointC = meshData.Vertices[c];
         return Vector3.Cross(pointB - pointA, pointC - pointA).normalized;
     }
-
 
     #endregion
 }
