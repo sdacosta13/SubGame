@@ -6,9 +6,12 @@ public class TerrainHandler : MonoBehaviour
 {
     private static ChunkManager _cm;
     public static bool DoThreading = true;
+    public static int MaxChunksLoadPerFrame = 3;
 
     private static Dictionary<Vector3, GameObject> _gameObjects;
     private GameObject _playerCam;
+
+    public GameObject terrainPrefab;
 
     // Start is called before the first frame update
     private void Start()
@@ -17,11 +20,12 @@ public class TerrainHandler : MonoBehaviour
         _cm = new ChunkManager();
         _gameObjects = new Dictionary<Vector3, GameObject>();
     }
-
+    
     // Update is called once per frame
     private void Update()
     {
         Profiler.BeginSample("UpdateTerrain");
+        int chunksLoaded = 0;
         var cameraPos = _playerCam.transform.position;
         cameraPos = cameraPos / Constants.chunkSize;
         var chunk = new Vector3((int) Mathf.Floor(cameraPos.x) * Constants.chunkSize,
@@ -38,43 +42,46 @@ public class TerrainHandler : MonoBehaviour
             }
         }
         Profiler.EndSample();
-    }
-
-    private static void UpdateChunk(int x, int y, int z, Vector3 chunk)
-    {
-        var chunkToLoadPos = new Vector3(x, y, z) * Constants.chunkSize + chunk;
-        if (_gameObjects.ContainsKey(chunkToLoadPos)) return;
-        if (_cm.ChunkExists(chunkToLoadPos))
+        
+        void UpdateChunk(int x, int y, int z, Vector3 chunkPos)
         {
-            if (DoThreading)
+            var chunkToLoadPos = new Vector3(x, y, z) * Constants.chunkSize + chunkPos;
+            if (_gameObjects.ContainsKey(chunkToLoadPos)) return;
+            if (_cm.ChunkExists(chunkToLoadPos))
             {
-                if (_cm.ChunkComplete(chunkToLoadPos))
+                if (DoThreading)
+                {
+                    if (_cm.ChunkComplete(chunkToLoadPos))
+                    {
+                        SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
+                    }
+                }
+                else
                 {
                     SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
                 }
             }
-            else
+            else if (MaxChunksLoadPerFrame == 0 || chunksLoaded < MaxChunksLoadPerFrame)
             {
-                SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
-            }
-        }
-        else
-        {
-            if (DoThreading)
-            {
-                Profiler.BeginSample("Chunk creation");
-                _cm.CreateChunk(chunkToLoadPos);
-                Profiler.EndSample();
-            }
-            else
-            {
-                Profiler.BeginSample("Creating chunk");
-                _cm.CreateChunk(chunkToLoadPos);
-                SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
-                Profiler.EndSample();
+                if (DoThreading)
+                {
+                    Profiler.BeginSample("Chunk creation");
+                    _cm.CreateChunk(chunkToLoadPos);
+                    Profiler.EndSample();
+                }
+                else
+                {
+                    Profiler.BeginSample("Creating chunk");
+                    _cm.CreateChunk(chunkToLoadPos);
+                    SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
+                    Profiler.EndSample();
+                }
+                chunksLoaded++;
             }
         }
     }
+
+    
 
     void AttemptLevelLoad(Vector3 chunkPos)
     {
@@ -95,20 +102,23 @@ public class TerrainHandler : MonoBehaviour
         _gameObjects[position] = go;
     }
 
-    private static void SetupGameObject(Vector3 position, Chunk c)
+    private void SetupGameObject(Vector3 position, Chunk c)
     {
         // around 100ms lag
+        // incurs massive garbage collection lag
         Profiler.BeginSample("SettingUp");
         
         Profiler.BeginSample("Making game object + adding components");
-        var go = new GameObject();
-        go.AddComponent<MeshFilter>();
-        go.AddComponent<MeshRenderer>();
-        go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
+        // var go = new GameObject();
+        // go.AddComponent<MeshFilter>();
+        // go.AddComponent<MeshRenderer>();
+        // go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
+        var go = Instantiate(terrainPrefab);
         Profiler.EndSample();
         
         Profiler.BeginSample("Assigning data");
         // maybe use unity mesh class instead of MeshData in chunk
+        // this section still has around 20 ms of lag
         var m = new Mesh
         {
             vertices = c.meshData.Vertices?.ToArray(),
