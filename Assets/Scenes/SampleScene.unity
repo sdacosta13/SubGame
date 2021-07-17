@@ -1205,6 +1205,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e3eb4457ac425f54ea54ee9656b137a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  terrainPrefab: {fileID: 5879532302490560518, guid: 8d13a8cf05f65cf408f3e0584b1b27db, type: 3}
 --- !u!1 &1912460837
 GameObject:
   m_ObjectHideFlags: 0

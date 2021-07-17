@@ -25,7 +25,7 @@ public class TerrainHandler : MonoBehaviour
     private void Update()
     {
         Profiler.BeginSample("UpdateTerrain");
-        int chunksLoaded = 0;
+        var chunksLoaded = 0;
         var cameraPos = _playerCam.transform.position;
         cameraPos = cameraPos / Constants.chunkSize;
         var chunk = new Vector3((int) Mathf.Floor(cameraPos.x) * Constants.chunkSize,
