@@ -1,56 +1,62 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 public class ChunkManager
 {
-    private Dictionary<Vector3, Chunk> chunks;
-    public Dictionary<Vector3, Thread> threads;
+    private Dictionary<Vector3, Chunk> _chunks;
+    public Dictionary<Vector3, bool> ChunkState;
+
     public ChunkManager()
     {
-        chunks = new Dictionary<Vector3, Chunk>();
-        threads = new Dictionary<Vector3, Thread>();
+        _chunks = new Dictionary<Vector3, Chunk>();
+        ChunkState = new Dictionary<Vector3, bool>();
     }
-    public bool chunkExists(Vector3 pos)
-    {
-        return chunks.ContainsKey(pos);
-    }
-    public bool chunkComplete(Vector3 pos)
-    {
-        return chunks[pos].meshData.done;
-    }
-    public Chunk GetChunk(Vector3 pos)
-    {
-        return chunks[pos];
-    }
+
+    public bool ChunkExists(Vector3 pos) => ChunkState.ContainsKey(pos);
+    public bool ChunkComplete(Vector3 pos) => ChunkState[pos];
+    public Chunk GetChunk(Vector3 pos) => _chunks[pos];
+
     public void CreateChunk(Vector3 pos)
     {
+        Profiler.BeginSample("Start Create");
         if (Constants.generateViaShaderCompute)
         {
-            Chunk c = new Chunk(pos);
-            chunks[pos] = c;
+            Profiler.BeginSample("ShaderCompute");
+            var c = new Chunk(pos);
+            _chunks[pos] = c;
             c.Generate();
+            Profiler.EndSample();
         }
         else
         {
-            if (!threads.ContainsKey(pos))
-            {
-                Chunk c = new Chunk(pos);
-                chunks[pos] = c;
-                Thread th = new Thread(c.Generate);
-                th.Priority = System.Threading.ThreadPriority.BelowNormal;
-                th.Name = pos.ToString() + " Chunk Generator";
-                th.Start();
-                threads[pos] = th;
+            Profiler.BeginSample("CPU generation");
+            if (TerrainHandler.DoThreading){
+                ChunkState[pos] = false;
+                _chunks[pos] = new Chunk(pos);
+                Profiler.BeginSample("Chunk, threaded");
+                Task.Run(() => _chunks[pos].Generate())
+                    .ContinueWith(task => ChunkState[pos] = true);
+                Profiler.EndSample();
             }
+            else
+            {
+                Profiler.BeginSample("Chunk, not threaded");
+                _chunks[pos] = new Chunk(pos, true);
+                Profiler.EndSample();
+            }
+            Profiler.EndSample();
         }
-        
-
+        Profiler.EndSample();
     }
+    
     public void Destroy()
     {
-        foreach(Chunk c in chunks.Values)
+        foreach (var c in _chunks.Values)
         {
             c.Destroy();
         }

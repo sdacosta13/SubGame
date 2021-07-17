@@ -1,103 +1,152 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Threading;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 public class TerrainHandler : MonoBehaviour
 {
-    static ChunkManager cm;
-    static Dictionary<Vector3, GameObject> gameObjects;
+    private static ChunkManager _cm;
+    public static bool DoThreading = true;
+    public static int MaxChunksLoadPerFrame = 3;
+
+    private static Dictionary<Vector3, GameObject> _gameObjects;
+    private GameObject _playerCam;
+
+    public GameObject terrainPrefab;
+
     // Start is called before the first frame update
-    void Start()
+    private void Start()
     {
-        cm = new ChunkManager();
-        gameObjects = new Dictionary<Vector3, GameObject>();
+        _playerCam = GameObject.Find("PlayerCamera");
+        _cm = new ChunkManager();
+        _gameObjects = new Dictionary<Vector3, GameObject>();
     }
-
+    
     // Update is called once per frame
-    void Update()
+    private void Update()
     {
-        Vector3 cameraPos = GameObject.Find("PlayerCamera").transform.position;
+        Profiler.BeginSample("UpdateTerrain");
+        int chunksLoaded = 0;
+        var cameraPos = _playerCam.transform.position;
         cameraPos = cameraPos / Constants.chunkSize;
-        Vector3 chunk = new Vector3((int)Mathf.Floor(cameraPos.x) * Constants.chunkSize, 
-                                    (int)Mathf.Floor(cameraPos.y) * Constants.chunkSize, 
-                                    (int)Mathf.Floor(cameraPos.z) * Constants.chunkSize); // Gives Vector to chunk start point
-        for(int x = -Constants.chunkloadradius; x < Constants.chunkloadradius+1; x++)
+        var chunk = new Vector3((int) Mathf.Floor(cameraPos.x) * Constants.chunkSize,
+            (int) Mathf.Floor(cameraPos.y) * Constants.chunkSize,
+            (int) Mathf.Floor(cameraPos.z) * Constants.chunkSize); // Gives Vector to chunk start point
+        for (var x = -Constants.chunkloadradius; x < Constants.chunkloadradius + 1; x++)
         {
-            for(int z = -Constants.chunkloadradius; z < Constants.chunkloadradius+1; z++)
+            for (var z = -Constants.chunkloadradius; z < Constants.chunkloadradius + 1; z++)
             {
-                for(int y = -Constants.chunkloadradius; y < Constants.chunkloadradius+1; y++)
+                for (var y = -Constants.chunkloadradius; y < Constants.chunkloadradius + 1; y++)
                 {
-                    Vector3 chunkToLoadPos = new Vector3(x, y, z) * Constants.chunkSize + chunk;
-                    if(!(gameObjects.ContainsKey(chunkToLoadPos))){
-
-                        if (cm.chunkExists(chunkToLoadPos))
-                        {
-                            // Chunk Object exists, not done for sure
-                            if (cm.chunkComplete(chunkToLoadPos))
-                            {
-                                SetupGameObject(chunkToLoadPos, cm.GetChunk(chunkToLoadPos));
-                            }
-                            else
-                            {
-                                // Chunk is still generating so do nothing
-                            }
-                        }
-                        else
-                        {
-                            cm.CreateChunk(chunkToLoadPos);
-                        }
-                    }
+                    UpdateChunk(x, y, z, chunk);
                 }
             }
         }
+        Profiler.EndSample();
+        
+        void UpdateChunk(int x, int y, int z, Vector3 chunkPos)
+        {
+            var chunkToLoadPos = new Vector3(x, y, z) * Constants.chunkSize + chunkPos;
+            if (_gameObjects.ContainsKey(chunkToLoadPos)) return;
+            if (_cm.ChunkExists(chunkToLoadPos))
+            {
+                if (DoThreading)
+                {
+                    if (_cm.ChunkComplete(chunkToLoadPos))
+                    {
+                        SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
+                    }
+                }
+                else
+                {
+                    SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
+                }
+            }
+            else if (MaxChunksLoadPerFrame == 0 || chunksLoaded < MaxChunksLoadPerFrame)
+            {
+                if (DoThreading)
+                {
+                    Profiler.BeginSample("Chunk creation");
+                    _cm.CreateChunk(chunkToLoadPos);
+                    Profiler.EndSample();
+                }
+                else
+                {
+                    Profiler.BeginSample("Creating chunk");
+                    _cm.CreateChunk(chunkToLoadPos);
+                    SetupGameObject(chunkToLoadPos, _cm.GetChunk(chunkToLoadPos));
+                    Profiler.EndSample();
+                }
+                chunksLoaded++;
+            }
+        }
     }
+
+    
+
     void AttemptLevelLoad(Vector3 chunkPos)
     {
         if (Constants.RWlevels)
         {
-            Mesh m = FileOperator.ReadMesh(chunkPos);
+            var m = FileOperator.ReadMesh(chunkPos);
             SetupLoadedGameObject(chunkPos, m);
-
         }
     }
-    static void SetupLoadedGameObject(Vector3 position, Mesh m)
+
+    private static void SetupLoadedGameObject(Vector3 position, Mesh m)
     {
-        GameObject go = new GameObject();
+        var go = new GameObject();
         go.AddComponent<MeshFilter>();
         go.AddComponent<MeshRenderer>();
         go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
         go.GetComponent<MeshFilter>().mesh = m;
-        gameObjects[position] = go;
+        _gameObjects[position] = go;
     }
-    static void SetupGameObject(Vector3 position, Chunk c)
+
+    private void SetupGameObject(Vector3 position, Chunk c)
     {
-        GameObject go = new GameObject();
-        go.AddComponent<MeshFilter>();
-        go.AddComponent<MeshRenderer>();
-        go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
-        Mesh m = new Mesh();
-        m.vertices = c.meshData.vertices.ToArray();
-        m.triangles = c.meshData.triangles.ToArray();
+        // around 100ms lag
+        // incurs massive garbage collection lag
+        Profiler.BeginSample("SettingUp");
+        
+        Profiler.BeginSample("Making game object + adding components");
+        // var go = new GameObject();
+        // go.AddComponent<MeshFilter>();
+        // go.AddComponent<MeshRenderer>();
+        // go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
+        var go = Instantiate(terrainPrefab);
+        Profiler.EndSample();
+        
+        Profiler.BeginSample("Assigning data");
+        // maybe use unity mesh class instead of MeshData in chunk
+        // this section still has around 20 ms of lag
+        var m = new Mesh
+        {
+            vertices = c.meshData.Vertices?.ToArray(),
+            triangles = c.meshData.Triangles?.ToArray()
+        };
         if (!Constants.generateViaShaderCompute)
         {
-            m.normals = c.meshData.normals;
+            m.normals = c.meshData.Normals;
         }
         else
         {
             m.RecalculateNormals();
         }
+
         go.GetComponent<MeshFilter>().mesh = m;
         if (Constants.RWlevels)
         {
-            FileOperator.WriteMesh(m, c.pos);
+            FileOperator.WriteMesh(m, c.Pos);
         }
-        gameObjects[position] = go;
+
+        _gameObjects[position] = go;
+        Profiler.EndSample();
+        
+        Profiler.EndSample();
     }
-    void OnDestroy()
+
+    private void OnDestroy()
     {
-        cm.Destroy();
+        _cm.Destroy();
     }
 }
