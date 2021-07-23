@@ -6,7 +6,8 @@ public class TerrainHandler : MonoBehaviour
 {
     private static ChunkManager _cm;
     public static bool DoThreading = true;
-    public static int MaxChunksLoadPerFrame = 3;
+    // 3 or 2 seems a good value when threaded
+    public static int MaxChunksLoadPerFrame = 4;
 
     private static Dictionary<Vector3, GameObject> _gameObjects;
     private GameObject _playerCam;

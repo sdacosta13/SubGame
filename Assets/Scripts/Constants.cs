@@ -4,9 +4,9 @@ using UnityEngine;
 
 public class Constants
 {
-    public static readonly int chunkSize = 32; //updating requires ChunkGenerator.compute to have array indices updated
+    public static readonly int chunkSize = 16; //updating requires ChunkGenerator.compute to have array indices updated
     public static readonly int maxChunkNum = 2;
-    public static readonly int chunkloadradius = 2;
+    public static readonly int chunkloadradius = 4;
     public static readonly string levelName = "TESTLEVEL";
 	public static readonly float perlinThreshold = 0.2f;
 	public static readonly bool generateViaShaderCompute = false;

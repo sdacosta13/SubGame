@@ -192,7 +192,7 @@ public class Chunk
                     // code in here runs around 32768 times per chunk
                     // so around 4m times on start
                     // maybe try 16x16x16 chunks
-                    
+
                     // Create an array of floats representing each corner of a cube and get the value from our terrainMap.
                     Profiler.BeginSample("Corner stuff");
                     var vec = new Vector3Int(x, y, z);
@@ -202,6 +202,7 @@ public class Chunk
                         var corner = vec + Constants.CornerTable[i];
                         cube[i] = _terrainMap[corner.x, corner.y, corner.z];
                     }
+
                     Profiler.EndSample();
 
                     // Pass the value into our MarchCube function.

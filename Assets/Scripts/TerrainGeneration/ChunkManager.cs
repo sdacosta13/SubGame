@@ -35,12 +35,17 @@ public class ChunkManager
         else
         {
             Profiler.BeginSample("CPU generation");
-            if (TerrainHandler.DoThreading){
+            if (TerrainHandler.DoThreading)
+            {
                 ChunkState[pos] = false;
                 _chunks[pos] = new Chunk(pos);
                 Profiler.BeginSample("Chunk, threaded");
-                Task.Run(() => _chunks[pos].Generate())
-                    .ContinueWith(task => ChunkState[pos] = true);
+                // apparently ConfigureAwait:false is free performance?
+                Task.Run(() =>
+                {
+                    _chunks[pos].Generate();
+                    ChunkState[pos] = true;
+                }).ConfigureAwait(false);
                 Profiler.EndSample();
             }
             else
@@ -49,11 +54,13 @@ public class ChunkManager
                 _chunks[pos] = new Chunk(pos, true);
                 Profiler.EndSample();
             }
+
             Profiler.EndSample();
         }
+
         Profiler.EndSample();
     }
-    
+
     public void Destroy()
     {
         foreach (var c in _chunks.Values)
