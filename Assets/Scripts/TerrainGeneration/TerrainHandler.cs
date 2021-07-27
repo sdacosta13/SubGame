@@ -100,6 +100,9 @@ public class TerrainHandler : MonoBehaviour
         go.AddComponent<MeshRenderer>();
         go.GetComponent<MeshRenderer>().material = new Material(Shader.Find("Standard"));
         go.GetComponent<MeshFilter>().mesh = m;
+        MeshCollider mc = go.AddComponent<MeshCollider>();
+        mc.sharedMesh = m;
+        Debug.Log("X");
         _gameObjects[position] = go;
     }
 
@@ -139,6 +142,8 @@ public class TerrainHandler : MonoBehaviour
         {
             FileOperator.WriteMesh(m, c.Pos);
         }
+        MeshCollider mc = go.AddComponent<MeshCollider>();
+        mc.sharedMesh = m;
 
         _gameObjects[position] = go;
         Profiler.EndSample();

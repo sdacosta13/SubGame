@@ -719,6 +719,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1221642705}
   - component: {fileID: 1221642704}
+  - component: {fileID: 1221642703}
   m_Layer: 0
   m_Name: SubCamera
   m_TagString: Untagged
@@ -726,6 +727,20 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &1221642703
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1221642702}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d582ac58aa2d3647921806bcbada16e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  PlayerCamera: {fileID: 609331225}
+  SubCamera: {fileID: 1221642704}
 --- !u!20 &1221642704
 Camera:
   m_ObjectHideFlags: 0
